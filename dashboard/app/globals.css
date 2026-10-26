@@ -1,0 +1,288 @@
+:root {
+  --bg: #ffffff;
+  --row: #ffffff;
+  --row-alt: #f6f8fa;
+  --border: #d1d9e0;
+  --text: #1f2328;
+  --muted: #59636e;
+  --company: #0969da;
+  --button: #e6eaef;
+  --button-text: #1f2328;
+  --chip-active: #0969da;
+  --fresh: rgba(26, 127, 55, 0.18);
+  --live: #1a7f37;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1117;
+    --row: #0d1117;
+    --row-alt: #151b23;
+    --border: #3d444d;
+    --text: #f0f6fc;
+    --muted: #9198a1;
+    --company: #4493f8;
+    --button: #3d444d;
+    --button-text: #f0f6fc;
+    --chip-active: #1f6feb;
+    --fresh: rgba(46, 160, 67, 0.22);
+    --live: #3fb950;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.board {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px 24px;
+  margin-bottom: 16px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 28px;
+}
+
+.subtitle {
+  margin: 2px 0 0;
+  color: var(--muted);
+}
+
+.status {
+  margin-left: 10px;
+  font-size: 13px;
+}
+
+.status::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: var(--muted);
+  vertical-align: 1px;
+}
+
+.status.live {
+  color: var(--live);
+}
+
+.status.live::before {
+  background: var(--live);
+}
+
+.search {
+  width: min(360px, 100%);
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--row-alt);
+  color: var(--text);
+  font: inherit;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 24px;
+  margin-bottom: 16px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.chip.active {
+  border-color: var(--chip-active);
+  background: var(--chip-active);
+  color: #fff;
+}
+
+.count {
+  margin-left: 6px;
+  opacity: 0.7;
+}
+
+.roles {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--border);
+}
+
+.roles th,
+.roles td {
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.roles th {
+  font-weight: 600;
+}
+
+.roles tbody tr:nth-child(odd) {
+  background: var(--row);
+}
+
+.roles tbody tr:nth-child(even) {
+  background: var(--row-alt);
+}
+
+.roles tr.fresh {
+  animation: fresh 6s ease-out;
+}
+
+@keyframes fresh {
+  from {
+    background: var(--fresh);
+  }
+}
+
+.company {
+  color: var(--company);
+  font-weight: 600;
+  min-width: 140px;
+}
+
+.same {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.location {
+  min-width: 150px;
+}
+
+.location summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.location ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.apply {
+  display: inline-block;
+  padding: 5px 14px;
+  border-radius: 6px;
+  background: var(--button);
+  color: var(--button-text);
+  text-decoration: none;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.apply:hover {
+  filter: brightness(1.15);
+}
+
+.age {
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.notice {
+  padding: 24px 0;
+  color: var(--muted);
+}
+
+.more {
+  display: block;
+  margin: 16px auto 0;
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--row-alt);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+/* Phones: each row becomes a card. */
+@media (max-width: 700px) {
+  .roles,
+  .roles tbody,
+  .roles tr,
+  .roles td {
+    display: block;
+    border: 0;
+  }
+
+  .roles thead {
+    display: none;
+  }
+
+  .roles tr {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2px 12px;
+    padding: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .roles td {
+    padding: 0;
+  }
+
+  .roles td.company {
+    grid-column: 1;
+  }
+
+  .roles td.age {
+    grid-column: 2;
+    grid-row: 1;
+    text-align: right;
+  }
+
+  .roles td.title,
+  .roles td.location {
+    grid-column: 1 / -1;
+  }
+
+  .roles td:has(.apply) {
+    grid-column: 1 / -1;
+    margin-top: 6px;
+  }
+}

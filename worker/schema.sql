@@ -39,3 +39,19 @@ create table if not exists excluded_keys (
 alter table roles enable row level security;
 alter table role_keys enable row level security;
 alter table excluded_keys enable row level security;
+
+-- Dashboard: the public (anon) key may read roles and nothing else. No
+-- insert/update/delete policies exist, so it can't write; role_keys and
+-- excluded_keys have no policies, so it can't read them either.
+do $$
+begin
+    if not exists (select 1 from pg_policies where tablename = 'roles' and policyname = 'Public read roles') then
+        create policy "Public read roles" on roles for select to anon, authenticated using (true);
+    end if;
+    -- Stream inserts/updates to the dashboard (Supabase Realtime).
+    if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
+       and not exists (select 1 from pg_publication_tables
+                       where pubname = 'supabase_realtime' and tablename = 'roles') then
+        alter publication supabase_realtime add table roles;
+    end if;
+end $$;
