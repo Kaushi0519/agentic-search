@@ -42,6 +42,13 @@ class TelegramNotifier:
         self.url = f"https://api.telegram.org/bot{token}/sendMessage"
         self.chat_id = chat_id
 
+    def send_text(self, text: str) -> None:
+        """Plain status message; failures are logged, never raised."""
+        try:
+            self.http.post(self.url, json={"chat_id": self.chat_id, "text": text})
+        except httpx.HTTPError:
+            log.exception("Telegram status message failed")
+
     def send(self, role: Role) -> bool:
         payload = {
             "chat_id": self.chat_id,
@@ -68,6 +75,9 @@ class TelegramNotifier:
 
 
 class ConsoleNotifier:
+    def send_text(self, text: str) -> None:
+        print(text)
+
     def send(self, role: Role) -> bool:
         print("─" * 40)
         print(format_message(role).replace("<b>", "").replace("</b>", ""))

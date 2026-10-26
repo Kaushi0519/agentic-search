@@ -25,3 +25,9 @@ create table if not exists role_keys (
     role_id    bigint not null references roles (id) on delete cascade,
     created_at timestamptz not null default now()
 );
+
+-- Supabase exposes public tables through its REST API using a public key.
+-- RLS with no policies blocks that API; the worker connects as the table
+-- owner and is unaffected. The dashboard gets a read-only policy later.
+alter table roles enable row level security;
+alter table role_keys enable row level security;

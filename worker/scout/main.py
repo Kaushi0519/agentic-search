@@ -21,6 +21,9 @@ from .store import MemoryStore, PostgresStore
 
 log = logging.getLogger("scout")
 
+# Consecutive failed polls of one source before Telegram gets a warning.
+ALERT_AFTER_FAILURES = 10
+
 
 def main() -> None:
     parser = argparse.ArgumentParser()
@@ -44,6 +47,8 @@ def main() -> None:
     pipeline = Pipeline(store, notifier, resolver.resolve)
     interval = int(os.environ.get("POLL_SECONDS", "60"))
 
+    failures = {src.name: 0 for src in SOURCES}
+
     while True:
         for src in SOURCES:
             try:
@@ -51,8 +56,17 @@ def main() -> None:
                     resolver.prefetch([l.url for l in update.listings])
                     pipeline.process(src.name, update.listings)
                     poller.commit(update)
+                if failures[src.name] >= ALERT_AFTER_FAILURES:
+                    notifier.send_text(f"✅ {src.name} is back to normal.")
+                failures[src.name] = 0
             except Exception:
                 log.exception("Polling %s failed; will retry", src.name)
+                failures[src.name] += 1
+                if failures[src.name] == ALERT_AFTER_FAILURES:
+                    notifier.send_text(
+                        f"⚠️ {src.name} has failed {ALERT_AFTER_FAILURES} polls in a row. "
+                        "New roles from it may be delayed; check the Railway logs."
+                    )
         try:
             if sent := pipeline.flush_notifications():
                 log.info("Sent %d notification(s)", sent)
