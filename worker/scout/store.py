@@ -14,6 +14,12 @@ class PostgresStore:
     def load_keys(self) -> list[tuple[str, int]]:
         return self.conn.execute("select key, role_id from role_keys").fetchall()
 
+    def load_excluded(self) -> set[str]:
+        return {k for (k,) in self.conn.execute("select key from excluded_keys")}
+
+    def add_excluded(self, key: str) -> None:
+        self.conn.execute("insert into excluded_keys (key) values (%s) on conflict do nothing", (key,))
+
     def insert_role(self, listing: Listing, locations: list[str], url: str,
                     keys: list[str], silent: bool) -> int:
         now = datetime.now(timezone.utc)
@@ -67,9 +73,16 @@ class MemoryStore:
     def __init__(self):
         self.roles: dict[int, dict] = {}
         self.keys: set[tuple[str, int]] = set()
+        self.excluded: set[str] = set()
 
     def load_keys(self) -> list[tuple[str, int]]:
         return list(self.keys)
+
+    def load_excluded(self) -> set[str]:
+        return set(self.excluded)
+
+    def add_excluded(self, key) -> None:
+        self.excluded.add(key)
 
     def insert_role(self, listing, locations, url, keys, silent) -> int:
         role_id = len(self.roles) + 1

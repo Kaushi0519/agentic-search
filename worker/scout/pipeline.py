@@ -17,6 +17,9 @@ class Pipeline:
         self.notifier = notifier
         self.resolve_url = resolve_url
         self.keys: dict[str, int] = dict(store.load_keys())
+        # Job IDs some source marked grad-only. Sources without degree data
+        # (vansh, zshah) can list the same job, so their copies are dropped too.
+        self.excluded: set[str] = store.load_excluded()
         # A source we've never stored anything from gets seeded silently,
         # so adding a source doesn't send hundreds of old roles.
         self.seeded = {k.split(":")[1] for k in self.keys if k.startswith("src:")}
@@ -30,12 +33,21 @@ class Pipeline:
             if src_key in self.keys:
                 continue
             locations = us_locations(listing.locations)
-            if locations is None or not is_undergrad(listing):
+            if locations is None:
+                stats["filtered"] += 1
+                continue
+            url = self.resolve_url(listing.url)
+            job_key = identity_key(url)
+            if not is_undergrad(listing):
+                if job_key not in self.excluded:
+                    self.store.add_excluded(job_key)
+                    self.excluded.add(job_key)
+                stats["filtered"] += 1
+                continue
+            if job_key in self.excluded:
                 stats["filtered"] += 1
                 continue
 
-            url = self.resolve_url(listing.url)
-            job_key = identity_key(url)
             keys = [src_key, job_key]
             role_id = self.keys.get(job_key)
             if role_id is not None:

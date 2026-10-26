@@ -10,7 +10,7 @@ UNDERGRAD_DEGREES = {"Bachelor's", "Associate's"}
 
 # "undergraduate" doesn't match \bgraduate\b, so it is kept.
 GRAD_TITLE_RE = re.compile(
-    r"\b(new grads?|new graduates?|recent graduates?|graduate|grad|"
+    r"\b(new grads?|new graduates?|recent graduates?|graduates?|grads?|"
     r"ph\.?\s?d|doctoral|doctorate|post-?doc|master'?s|mba|m\.?s\.?/ph\.?d)\b",
     re.IGNORECASE,
 )

@@ -57,6 +57,7 @@ def test_mixed_locations_keep_only_us():
     ("Undergraduate Research Intern", None, True),
     ("MBA Product Intern", None, False),
     ("Masters Intern", None, False),
+    ("Software Engineer Intern - Graduates", None, False),
 ])
 def test_undergrad(title, degrees, expected):
     assert is_undergrad(listing(title=title, degrees=degrees)) is expected
@@ -166,6 +167,28 @@ def test_pipeline_survives_restart():
     p.process("zshah", [])
     p.process("zshah", [amazon("zshah", "z", "https://amazon.jobs/en/jobs/1001/y", ["Seattle"])])
     assert len(store.roles) == 1 and store.roles[1]["sources"] == ["simplify", "zshah"]
+
+
+def test_grad_only_job_id_blocks_other_sources(monkeypatch):
+    monkeypatch.setattr("scout.pipeline.time.sleep", lambda s: None)
+    store, notifier = MemoryStore(), Recorder()
+    p = Pipeline(store, notifier, lambda u: u)
+    p.process("simplify", [])
+    p.process("zshah", [])
+    url = "https://ats.rippling.com/rippling/jobs/f9de04c3-e2c5-41f9-8e46-a0684707f89d"
+    p.process("simplify", [listing(source_id="r", company="Rippling", title="ML Software Engineer Intern",
+                                   url=url, degrees=["Master's", "PhD"])])
+    # zshah has no degree data, but the same job ID was already marked grad-only.
+    p.process("zshah", [listing(source="zshah", source_id="z", company="Rippling",
+                                title="Machine Learning Software Engineer Intern - Summer 2027", url=url)])
+    assert store.roles == {} and p.flush_notifications() == 0
+    # Survives a restart.
+    assert url_excluded(Pipeline(store, notifier, lambda u: u), url)
+
+
+def url_excluded(p, url):
+    from scout.dedup import identity_key
+    return identity_key(url) in p.excluded
 
 
 def test_filtered_roles_never_stored():
