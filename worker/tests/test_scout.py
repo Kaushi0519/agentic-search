@@ -58,6 +58,7 @@ def test_mixed_locations_keep_only_us():
     ("MBA Product Intern", None, False),
     ("Masters Intern", None, False),
     ("Software Engineer Intern - Graduates", None, False),
+    ("Quantitative Master’s Intern", None, False),
 ])
 def test_undergrad(title, degrees, expected):
     assert is_undergrad(listing(title=title, degrees=degrees)) is expected
@@ -196,3 +197,33 @@ def test_filtered_roles_never_stored():
     p = Pipeline(store, Recorder(), lambda u: u)
     p.process("simplify", [listing(locations=["London, UK"]), listing(source_id="2", title="PhD Intern")])
     assert store.roles == {}
+
+
+@pytest.mark.parametrize("url,expected", [
+    ("https://freddiemac.wd5.myworkdayjobs.com/External/job/McLean-VA/Risk-Management-Graduate-Intern---Quantitative-Summer-2027_JR17553", False),
+    ("https://amazon.jobs/en/jobs/10556927/2027-data-science-internship-united-states-phd-or-masters-student", False),
+    ("https://amgen.wd1.myworkdayjobs.com/careers/job/Remote/Grad-Intern---Software-Engineer_R-255745", False),
+    # Career-site names and class-of years aren't the job title.
+    ("https://lseg.wd3.myworkdayjobs.com/Graduate_Careers/job/Boston/Engineering-Summer-Internship-Programme_R0123570-1", True),
+    ("https://ryan.wd1.myworkdayjobs.com/Students-Graduates/job/Plano/Summer-2027-Intern--Software-Engineering_R0020843", True),
+    ("https://gartner.wd5.myworkdayjobs.com/EXT/job/Irving-TX/Data-Analyst-Internship--2028-Graduates-_113297", True),
+    ("https://job-boards.greenhouse.io/astranis/jobs/4715985006", True),
+])
+def test_undergrad_checks_url_title(url, expected):
+    assert is_undergrad(listing(title="Intern", url=url)) is expected
+
+
+def test_old_postings_are_stored_without_alert(monkeypatch):
+    monkeypatch.setattr("scout.pipeline.time.sleep", lambda s: None)
+    store, notifier = MemoryStore(), Recorder()
+    p = Pipeline(store, notifier, lambda u: u)
+    p.process("simplify", [])
+    now = datetime.now(timezone.utc)
+    p.process("simplify", [
+        listing(source_id="old", url="https://example.com/job/1", posted_at=now - timedelta(days=60)),
+        listing(source_id="new", url="https://example.com/job/2", posted_at=now - timedelta(days=1)),
+        listing(source_id="undated", url="https://example.com/job/3"),
+    ])
+    assert len(store.roles) == 3
+    assert store.roles[1]["first_seen_at"] == now - timedelta(days=60)
+    assert p.flush_notifications() == 2

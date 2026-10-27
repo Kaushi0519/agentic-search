@@ -1,6 +1,7 @@
 """Undergrad and US-location filters."""
 
 import re
+from urllib.parse import unquote, urlsplit
 
 from .models import Listing
 
@@ -11,13 +12,27 @@ UNDERGRAD_DEGREES = {"Bachelor's", "Associate's"}
 # "undergraduate" doesn't match \bgraduate\b, so it is kept.
 GRAD_TITLE_RE = re.compile(
     r"\b(new grads?|new graduates?|recent graduates?|graduates?|grads?|"
-    r"ph\.?\s?d|doctoral|doctorate|post-?doc|master'?s|mba|m\.?s\.?/ph\.?d)\b",
+    r"ph\.?\s?d|doctoral|doctorate|post-?doc|master['’]?s|mba|m\.?s\.?/ph\.?d)\b",
     re.IGNORECASE,
 )
 
 
-def is_undergrad(listing: Listing) -> bool:
+# Workday-style "2028 Graduates" means class of 2028, i.e. undergrads.
+CLASS_OF_RE = re.compile(r"\b(?:class of )?20\d\d graduates?\b", re.IGNORECASE)
+
+
+def url_title(url: str) -> str:
+    """The posting's own title from the URL's last segment, e.g.
+    ".../job/McLean-VA/Risk-Management-Graduate-Intern_JR17553" → "Risk Management Graduate Intern JR17553".
+    Lists sometimes rewrite titles and drop "Graduate"; the company's slug keeps it."""
+    segment = unquote(urlsplit(url).path).rstrip("/").rsplit("/", 1)[-1]
+    return CLASS_OF_RE.sub("", re.sub(r"[-_+]+", " ", segment))
+
+
+def is_undergrad(listing: Listing, url: str | None = None) -> bool:
     if GRAD_TITLE_RE.search(listing.title):
+        return False
+    if GRAD_TITLE_RE.search(url_title(url or listing.url)):
         return False
     # An empty or missing degree list means the source doesn't know; keep it.
     if listing.degrees and not UNDERGRAD_DEGREES.intersection(listing.degrees):

@@ -2,6 +2,7 @@
 
 import logging
 import time
+from datetime import datetime, timedelta, timezone
 from typing import Callable
 
 from .dedup import identity_key
@@ -9,6 +10,15 @@ from .filters import is_undergrad, us_locations
 from .models import Listing
 
 log = logging.getLogger(__name__)
+
+# Roles a list adds (or reopens) long after the company posted them go on the
+# dashboard under their real age but don't send an alert.
+MAX_ALERT_AGE = timedelta(days=2)
+
+
+def is_stale(listing: Listing) -> bool:
+    return (listing.posted_at is not None
+            and datetime.now(timezone.utc) - listing.posted_at > MAX_ALERT_AGE)
 
 
 class Pipeline:
@@ -27,7 +37,7 @@ class Pipeline:
     def process(self, source: str, listings: list[Listing]) -> dict[str, int]:
         """Same job ID = same role; different job IDs = different roles."""
         silent = source not in self.seeded
-        stats = {"new": 0, "duplicate": 0, "filtered": 0}
+        stats = {"new": 0, "old": 0, "duplicate": 0, "filtered": 0}
         for listing in listings:
             src_key = f"src:{source}:{listing.source_id}"
             if src_key in self.keys:
@@ -38,7 +48,7 @@ class Pipeline:
                 continue
             url = self.resolve_url(listing.url)
             job_key = identity_key(url)
-            if not is_undergrad(listing):
+            if not is_undergrad(listing, url):
                 if job_key not in self.excluded:
                     self.store.add_excluded(job_key)
                     self.excluded.add(job_key)
@@ -54,8 +64,9 @@ class Pipeline:
                 self.store.attach(role_id, keys, source, locations)
                 stats["duplicate"] += 1
             else:
-                role_id = self.store.insert_role(listing, locations, url, keys, silent)
-                stats["new"] += 1
+                quiet = silent or is_stale(listing)
+                role_id = self.store.insert_role(listing, locations, url, keys, quiet)
+                stats["old" if quiet and not silent else "new"] += 1
             for k in keys:
                 self.keys[k] = role_id
 
