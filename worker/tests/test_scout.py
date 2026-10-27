@@ -227,3 +227,24 @@ def test_old_postings_are_stored_without_alert(monkeypatch):
     assert len(store.roles) == 3
     assert store.roles[1]["first_seen_at"] == now - timedelta(days=60)
     assert p.flush_notifications() == 2
+
+
+def test_list_location_replaced_by_employers(monkeypatch):
+    monkeypatch.setattr("scout.pipeline.time.sleep", lambda s: None)
+    real = {"https://jobs.apple.com/en-us/details/1": ["Shanghai, Shanghai, China"],
+            "https://jobs.apple.com/en-us/details/2": ["Cupertino, California, United States"]}
+    store, notifier = MemoryStore(), Recorder()
+    p = Pipeline(store, notifier, lambda u: u, real.get)
+    p.process("vansh", [])
+    p.process("vansh", [
+        listing(source="vansh", source_id="1", url="https://jobs.apple.com/en-us/details/1", locations=["United States"]),
+        listing(source="vansh", source_id="2", url="https://jobs.apple.com/en-us/details/2", locations=["United States"]),
+    ])
+    assert [r["locations"] for r in store.roles.values()] == [["Cupertino, California, United States"]]
+
+
+def test_apple_location_format():
+    from scout.verify import _apple_location
+    assert _apple_location({"name": "United States", "countryName": "United States"}) == "United States"
+    assert _apple_location({"name": "Shanghai", "city": "Shanghai", "stateProvince": "Shanghai",
+                            "countryName": "China"}) == "Shanghai, Shanghai, China"

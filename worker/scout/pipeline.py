@@ -22,10 +22,12 @@ def is_stale(listing: Listing) -> bool:
 
 
 class Pipeline:
-    def __init__(self, store, notifier, resolve_url: Callable[[str], str]):
+    def __init__(self, store, notifier, resolve_url: Callable[[str], str],
+                 check_locations: Callable[[str], list[str] | None] = lambda url: None):
         self.store = store
         self.notifier = notifier
         self.resolve_url = resolve_url
+        self.check_locations = check_locations
         self.keys: dict[str, int] = dict(store.load_keys())
         # Job IDs some source marked grad-only. Sources without degree data
         # (vansh, zshah) can list the same job, so their copies are dropped too.
@@ -47,6 +49,11 @@ class Pipeline:
                 stats["filtered"] += 1
                 continue
             url = self.resolve_url(listing.url)
+            if (real := self.check_locations(url)) is not None:
+                locations = us_locations(real)
+                if locations is None:
+                    stats["filtered"] += 1
+                    continue
             job_key = identity_key(url)
             if not is_undergrad(listing, url):
                 if job_key not in self.excluded:
