@@ -11,6 +11,10 @@
   --chip-active: #0969da;
   --fresh: rgba(26, 127, 55, 0.18);
   --live: #1a7f37;
+  --tag: #eef1f4;
+  --tag-text: #59636e;
+  --tag-summer: #dafbe1;
+  --tag-summer-text: #1a7f37;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -27,6 +31,10 @@
     --chip-active: #1f6feb;
     --fresh: rgba(46, 160, 67, 0.22);
     --live: #3fb950;
+    --tag: #262c36;
+    --tag-text: #9198a1;
+    --tag-summer: rgba(46, 160, 67, 0.15);
+    --tag-summer-text: #3fb950;
   }
 }
 
@@ -199,6 +207,26 @@ h1 {
   padding-left: 18px;
 }
 
+.term {
+  min-width: 110px;
+}
+
+.term-tag {
+  display: inline-block;
+  margin: 2px 4px 2px 0;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--tag);
+  color: var(--tag-text);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.term-tag.summer {
+  background: var(--tag-summer);
+  color: var(--tag-summer-text);
+}
+
 .apply {
   display: inline-block;
   padding: 5px 14px;
@@ -277,7 +305,8 @@ h1 {
   }
 
   .roles td.title,
-  .roles td.location {
+  .roles td.location,
+  .roles td.term {
     grid-column: 1 / -1;
   }
 

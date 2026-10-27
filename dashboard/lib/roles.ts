@@ -7,11 +7,12 @@ export type Role = {
   url: string;
   locations: string[];
   category: string | null;
+  terms: string[] | null;
   sources: string[];
   first_seen_at: string;
 };
 
-export const ROLE_COLUMNS = "id, company, title, url, locations, category, sources, first_seen_at";
+export const ROLE_COLUMNS = "id, company, title, url, locations, category, terms, sources, first_seen_at";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -32,6 +33,22 @@ export function categoryOf(raw: string | null): Category {
   if (/\b(ai|ml|data|machine learning)\b/.test(s)) return "AI/ML/Data";
   if (s.includes("software")) return "Software";
   return "Other";
+}
+
+export const TERM_GROUPS = ["Summer", "Off-season"] as const;
+export type TermGroup = (typeof TERM_GROUPS)[number];
+
+/** Lists say "Summer 2027", "Summer" or "N/A"; drop the placeholders. */
+export function termsOf(terms: string[] | null): string[] {
+  return (terms ?? []).filter((t) => t && t !== "N/A");
+}
+
+/** Summer if any term is a summer; off-season if it only runs in fall, winter or spring. */
+export function termGroupOf(terms: string[] | null): TermGroup | null {
+  const known = termsOf(terms);
+  if (known.some((t) => /summer/i.test(t))) return "Summer";
+  if (known.some((t) => /fall|winter|spring/i.test(t))) return "Off-season";
+  return null;
 }
 
 /** Same style as the GitHub lists: now, 12m, 5h, 2d. */

@@ -3,12 +3,16 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   CATEGORIES,
+  TERM_GROUPS,
   type Category,
   type Role,
+  type TermGroup,
   categoryOf,
   fetchAllRoles,
   formatAge,
   supabase,
+  termGroupOf,
+  termsOf,
 } from "@/lib/roles";
 
 const PAGE = 100;
@@ -28,6 +32,7 @@ export default function RolesBoard() {
 
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<Category | "All">("All");
+  const [term, setTerm] = useState<TermGroup | "All">("All");
   const [added, setAdded] = useState<Window>("all");
   const [limit, setLimit] = useState(PAGE);
 
@@ -70,13 +75,14 @@ export default function RolesBoard() {
     return roles.filter(
       (r) =>
         (category === "All" || categoryOf(r.category) === category) &&
+        (term === "All" || termGroupOf(r.terms) === term) &&
         new Date(r.first_seen_at).getTime() >= since &&
         (!q ||
           r.company.toLowerCase().includes(q) ||
           r.title.toLowerCase().includes(q) ||
           r.locations.some((l) => l.toLowerCase().includes(q))),
     );
-  }, [roles, query, category, added, now]);
+  }, [roles, query, category, term, added, now]);
 
   const counts = useMemo(() => {
     const c = new Map<Category, number>();
@@ -132,6 +138,20 @@ export default function RolesBoard() {
             </button>
           ))}
         </div>
+        <div className="chips" role="group" aria-label="Term">
+          {(["All", ...TERM_GROUPS] as const).map((t) => (
+            <button
+              key={t}
+              className={term === t ? "chip active" : "chip"}
+              onClick={() => {
+                setTerm(t);
+                setLimit(PAGE);
+              }}
+            >
+              {t === "All" ? "All terms" : t}
+            </button>
+          ))}
+        </div>
         <div className="chips" role="group" aria-label="Added">
           {(Object.keys(WINDOWS) as Window[]).map((w) => (
             <button
@@ -159,6 +179,7 @@ export default function RolesBoard() {
                 <th>Company</th>
                 <th>Role</th>
                 <th>Location</th>
+                <th>Term</th>
                 <th>Application</th>
                 <th>Age</th>
               </tr>
@@ -176,6 +197,9 @@ export default function RolesBoard() {
                   <td className="title">{r.title}</td>
                   <td className="location">
                     <Locations locations={r.locations} />
+                  </td>
+                  <td className="term">
+                    <Terms terms={termsOf(r.terms)} />
                   </td>
                   <td>
                     <a className="apply" href={r.url} target="_blank" rel="noopener noreferrer">
@@ -212,5 +236,18 @@ function Locations({ locations }: { locations: string[] }) {
         ))}
       </ul>
     </details>
+  );
+}
+
+function Terms({ terms }: { terms: string[] }) {
+  if (terms.length === 0) return <span className="muted">—</span>;
+  return (
+    <>
+      {terms.map((t) => (
+        <span key={t} className={/summer/i.test(t) ? "term-tag summer" : "term-tag"}>
+          {t}
+        </span>
+      ))}
+    </>
   );
 }
