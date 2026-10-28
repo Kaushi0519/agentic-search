@@ -264,3 +264,12 @@ def test_apple_location_format():
 def test_past_terms(terms, expected):
     from datetime import date
     assert is_past_term(terms, date(2026, 10, 28)) is expected
+
+
+def test_zshah_dates_are_timezone_aware():
+    from scout.sources import parse_zshah
+    jobs = {"a": {"company": "T-Mobile", "title": "Software Engineering Intern", "is_open": True,
+                  "url": "https://example.com/job/1", "location": "Overland Park, Kansas",
+                  "posted_at": "2026-10-28"}}
+    (l,) = parse_zshah(jobs, "zshah")
+    assert l.posted_at.tzinfo is not None

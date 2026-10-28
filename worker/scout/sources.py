@@ -19,9 +19,11 @@ def _from_unix(ts: int | None) -> datetime | None:
 
 def _from_iso(s: str | None) -> datetime | None:
     try:
-        return datetime.fromisoformat(s) if s else None
+        dt = datetime.fromisoformat(s) if s else None
     except ValueError:
         return None
+    # zshah writes some dates as plain "2026-10-28"; treat those as UTC.
+    return dt.replace(tzinfo=timezone.utc) if dt and dt.tzinfo is None else dt
 
 
 def parse_simplify_format(data: list[dict], source: str) -> list[Listing]:
