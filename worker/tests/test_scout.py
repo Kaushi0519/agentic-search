@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from scout.dedup import canonical_url, identity_key, job_id
-from scout.filters import classify_location, is_undergrad, us_locations
+from scout.filters import classify_location, is_past_term, is_undergrad, us_locations
 from scout.models import Listing
 from scout.notify import format_age
 from scout.pipeline import Pipeline
@@ -248,3 +248,19 @@ def test_apple_location_format():
     assert _apple_location({"name": "United States", "countryName": "United States"}) == "United States"
     assert _apple_location({"name": "Shanghai", "city": "Shanghai", "stateProvince": "Shanghai",
                             "countryName": "China"}) == "Shanghai, Shanghai, China"
+
+
+@pytest.mark.parametrize("terms,expected", [
+    (["Summer 2026"], True),
+    (["Spring 2026", "Summer 2026"], True),
+    (["Summer 2025", "Fall 2025"], True),
+    (["Summer 2026", "Fall 2026"], False),
+    (["Summer 2027"], False),
+    (["Winter 2026"], False),  # ambiguous year boundary
+    (["Summer"], False),
+    (["N/A"], False),
+    ([], False),
+])
+def test_past_terms(terms, expected):
+    from datetime import date
+    assert is_past_term(terms, date(2026, 10, 28)) is expected

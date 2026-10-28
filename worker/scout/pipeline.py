@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Callable
 
 from .dedup import identity_key
-from .filters import is_undergrad, us_locations
+from .filters import is_past_term, is_undergrad, us_locations
 from .models import Listing
 
 log = logging.getLogger(__name__)
@@ -45,7 +45,7 @@ class Pipeline:
             if src_key in self.keys:
                 continue
             locations = us_locations(listing.locations)
-            if locations is None:
+            if locations is None or is_past_term(listing.terms):
                 stats["filtered"] += 1
                 continue
             url = self.resolve_url(listing.url)

@@ -1,6 +1,7 @@
 """Undergrad and US-location filters."""
 
 import re
+from datetime import date
 from urllib.parse import unquote, urlsplit
 
 from .models import Listing
@@ -37,6 +38,32 @@ def is_undergrad(listing: Listing, url: str | None = None) -> bool:
     # An empty or missing degree list means the source doesn't know; keep it.
     if listing.degrees and not UNDERGRAD_DEGREES.intersection(listing.degrees):
         return False
+    return True
+
+
+# --- Term ------------------------------------------------------------------
+
+TERM_RE = re.compile(r"\b(winter|spring|summer|fall)\s+(20\d\d)\b", re.IGNORECASE)
+# Last month of each term. Winter is left out: "Winter 2026" can mean
+# Jan–Apr 2026 or Dec 2026–Mar 2027 depending on the company.
+TERM_ENDS = {"spring": 5, "summer": 8, "fall": 12}
+
+
+def is_past_term(terms: list[str], today: date | None = None) -> bool:
+    """True when every term is dated and already over (e.g. only "Summer 2026"
+    after August 2026). Undated or unknown terms count as current."""
+    today = today or date.today()
+    if not terms:
+        return False
+    for term in terms:
+        m = TERM_RE.search(term)
+        if not m:
+            return False
+        season, year = m[1].lower(), int(m[2])
+        if year >= today.year and not (
+            year == today.year and season in TERM_ENDS and today.month > TERM_ENDS[season]
+        ):
+            return False
     return True
 
 
