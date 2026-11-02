@@ -227,6 +227,12 @@ h1 {
   color: var(--tag-summer-text);
 }
 
+.system {
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
 .apply {
   display: inline-block;
   padding: 5px 14px;
@@ -306,7 +312,8 @@ h1 {
 
   .roles td.title,
   .roles td.location,
-  .roles td.term {
+  .roles td.term,
+  .roles td.system {
     grid-column: 1 / -1;
   }
 

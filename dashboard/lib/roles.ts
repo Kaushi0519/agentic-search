@@ -51,6 +51,45 @@ export function termGroupOf(terms: string[] | null): TermGroup | null {
   return null;
 }
 
+// Hosted application systems, matched on the posting URL's domain.
+const SYSTEMS: [RegExp, string][] = [
+  [/(^|\.)(myworkdayjobs|myworkdaysite|workday)\.com$/, "Workday"],
+  [/(^|\.)greenhouse\.io$/, "Greenhouse"],
+  [/(^|\.)ashbyhq\.com$/, "Ashby"],
+  [/(^|\.)lever\.co$/, "Lever"],
+  [/(^|\.)oraclecloud\.com$/, "Oracle"],
+  [/(^|\.)taleo\.net$/, "Taleo"],
+  [/(^|\.)smartrecruiters\.com$/, "SmartRecruiters"],
+  [/(^|\.)icims\.com$/, "iCIMS"],
+  [/(^|\.)eightfold\.ai$/, "Eightfold"],
+  [/(^|\.)jibeapply\.com$/, "Jibe"],
+  [/(^|\.)applytojob\.com$/, "JazzHR"],
+  [/(^|\.)paylocity\.com$/, "Paylocity"],
+  [/(^|\.)workable\.com$/, "Workable"],
+  [/(^|\.)rippling\.com$/, "Rippling"],
+  [/(^|\.)jobvite\.com$/, "Jobvite"],
+  [/(^|\.)avature\.net$/, "Avature"],
+  [/(^|\.)successfactors\.(com|eu)$/, "SuccessFactors"],
+  [/(^|\.)bamboohr\.com$/, "BambooHR"],
+  [/(^|\.)breezy\.hr$/, "Breezy"],
+];
+
+/** The application system behind a posting, or "Company site" for in-house portals. */
+export function systemOf(url: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return "Company site";
+  }
+  const match = SYSTEMS.find(([re]) => re.test(parsed.hostname));
+  if (match) return match[1];
+  // Greenhouse and Ashby boards embedded on a company's own careers page.
+  if (parsed.searchParams.has("gh_jid")) return "Greenhouse";
+  if (parsed.searchParams.has("ashby_jid")) return "Ashby";
+  return "Company site";
+}
+
 /** Same style as the GitHub lists: now, 12m, 5h, 2d. */
 export function formatAge(iso: string, now: number): string {
   const minutes = Math.floor((now - new Date(iso).getTime()) / 60_000);
