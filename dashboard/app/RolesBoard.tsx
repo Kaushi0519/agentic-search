@@ -182,8 +182,8 @@ export default function RolesBoard() {
                 <th>Location</th>
                 <th>Term</th>
                 <th>Application</th>
-                <th>System</th>
                 <th>Age</th>
+                <th>System</th>
               </tr>
             </thead>
             <tbody>
@@ -208,8 +208,8 @@ export default function RolesBoard() {
                       Apply
                     </a>
                   </td>
-                  <td className="system">{systemOf(r.url)}</td>
                   <td className="age">{formatAge(r.first_seen_at, now)}</td>
+                  <td className="system">{systemOf(r.url)}</td>
                 </tr>
               ))}
             </tbody>
