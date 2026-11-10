@@ -176,6 +176,9 @@ def main() -> None:
         # A real, visible browser with a saved profile passes reCAPTCHA far more often.
         ctx = pw.chromium.launch_persistent_context(
             PRIVATE / "browser-profile", headless=False, viewport={"width": 1280, "height": 1000})
+        # Close the blank start-up tab so a window only shows while a form is being filled.
+        for page in ctx.pages:
+            page.close()
         runner = Runner(ctx, profile, store, tg)
         tg.send("🟢 Auto-apply is running.")
         log.info("watching for roles added after %s", since)
