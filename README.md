@@ -86,7 +86,7 @@ See [dashboard/README.md](dashboard/README.md). On Vercel, set the root director
 
 ## Cost
 
-Supabase, Vercel (Hobby), Telegram and the GitHub API are free at this scale. Railway is the only paid piece (Hobby plan, about $5/month).
+About $6/month: Railway ($5) and Haiku for auto-apply (~$1); everything else is on free plans. See [COSTS.md](COSTS.md) for the breakdown and a log of changes.
 
 ## Roadmap
 
