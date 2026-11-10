@@ -51,6 +51,8 @@ def _rule(q: Question, p: Profile) -> Answer | None:
     }
     if q.field in text:
         return Answer(text[q.field], "profile")
+    if q.field == "comments":
+        return Answer(None, "rule")  # Lever's free-form "Additional information": leave blank
     if q.kind == "location":
         return Answer(None, "profile")  # each form's location search box is filled by its filler
     if q.kind == "text":

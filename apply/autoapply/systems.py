@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from types import ModuleType
 from typing import Callable
 
-from . import ashby, greenhouse_api, greenhouse_form
+from . import ashby, greenhouse_api, greenhouse_form, lever
 
 
 @dataclass
@@ -22,6 +22,7 @@ def _module_system(name: str, m: ModuleType) -> System:
 
 SYSTEMS = [
     _module_system("Ashby", ashby),
+    _module_system("Lever", lever),
     System("Greenhouse", lambda url: greenhouse_api.parse_url(url) is not None,
            greenhouse_api.fetch_job, greenhouse_form.fill, greenhouse_form.submit),
 ]
