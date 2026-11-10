@@ -107,14 +107,19 @@ def fill(page: Page, job: Job, answers: dict[str, Answer], p: Profile) -> list[s
         try:
             if q.kind == "location":
                 box = page.locator(f'input[name="{field}"]')
-                box.click()
+                box.fill("")
                 box.press_sequentially(f'{p["address.city"]}, {p["address.state"]}', delay=60)
-                result = page.locator(".dropdown-location .dropdown-results > div, .dropdown-results div")
+                result = page.locator(".dropdown-results .dropdown-location")
                 result.first.wait_for(timeout=8000)
-                match = result.filter(has_text="Virginia")
+                match = result.filter(has_text=re.compile(r"\bVA\b|Virginia"))
                 (match if match.count() else result).first.click()
                 continue
-            if field == "resume" or a.value in (None, "", []):
+            if field == "resume":
+                continue
+            if a.value in (None, "", []):
+                # Lever prefills some fields from the resume (e.g. current company); blank means blank.
+                if q.kind in ("text", "textarea") and (box := page.locator(f'[name="{field}"]').first).input_value():
+                    box.fill("")
                 continue
             if q.kind in ("text", "textarea"):
                 page.locator(f'[name="{field}"]').first.fill(str(a.value))
@@ -133,6 +138,10 @@ def fill(page: Page, job: Job, answers: dict[str, Answer], p: Profile) -> list[s
 
 
 CONFIRM_RE = re.compile(r"application (submitted|received)|thanks? (you )?for applying", re.I)
+
+
+def confirmed(page: Page) -> bool:
+    return "/thanks" in page.url or bool(CONFIRM_RE.search(page.inner_text("body")))
 
 
 def submit(page: Page, screenshot, ask_code=None, get_code=None) -> str:

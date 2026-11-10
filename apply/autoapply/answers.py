@@ -55,6 +55,8 @@ def _rule(q: Question, p: Profile) -> Answer | None:
         return Answer(None, "rule")  # Lever's free-form "Additional information": leave blank
     if q.kind == "location":
         return Answer(None, "profile")  # each form's location search box is filled by its filler
+    if re.search(r"current (company|employer)", label):
+        return Answer(None, "rule")  # left blank on purpose
     if q.kind == "text":
         if re.fullmatch(r"(full |legal )?name", label):
             return Answer(f'{p["name.first"]} {p["name.last"]}', "profile")
@@ -86,7 +88,9 @@ def _rule(q: Question, p: Profile) -> Answer | None:
         (r"authori[sz]ed to work|legally (able|eligible|permitted) to work|right to work", (YES,)),
         (r"sponsor", (NO,)),
         (r"18 years|age of 18", (YES,)),
-        (r"relocat", (YES,)),
+        # "Yes, I'm willing to relocate" — never "Yes, I already live there". Anything else goes to Haiku.
+        (r"relocat", (r"(willing|open|able|plan(ning)?|happy) to (re)?locate|will relocate|relocate (myself|on my own)",
+                      r"^\s*yes\s*\.?$", r"^\s*yes\b(?!.*\b(already|currently)\b)")),
         (r"veteran", (r"not a protected veteran", r"^i am not", NO)),
         (r"disabilit", (r"^no,? i (do not|don'?t) have", NO)),
         (r"lgbt", (NO,)),
@@ -130,6 +134,12 @@ otherwise give the typical hourly rate for this kind of internship at this compa
 non-competes, conflicts of interest, clearances) come from the profile's `facts`.
 - Class year / academic standing / "undergrad level": use `facts.class_standing`, not the \
 dates; it already accounts for the candidate graduating early.
+- Location and relocation: the candidate is open to, available for and willing to relocate \
+anywhere in the US, with no relocation assistance needed. Always say so. When asked to choose \
+preferred locations or offices, pick options matching `facts.preferred_locations`, in that order \
+(respect any limit like "select 1-3"); if none match, pick the largest cities offered. In a \
+free-text location question, just say they're open to relocating anywhere in the US; don't \
+list other cities or add extra sentences.
 - Website / portfolio questions: the candidate has no portfolio site. Leave them empty; never \
 put the GitHub link there unless the question asks for GitHub specifically.
 - Acknowledgements and certifications that the application is accurate: agree.

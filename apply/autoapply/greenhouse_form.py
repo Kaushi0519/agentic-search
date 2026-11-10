@@ -55,6 +55,8 @@ def fill(page: Page, job: Job, answers: dict[str, Answer], p: Profile) -> list[s
     # Fields the API doesn't list: country (before phone) and the education block.
     extras = [
         ("country", lambda: _choose_first(page, "country", "United States")),
+        # Not in the API, and the race question only appears once it's answered.
+        ("hispanic_ethnicity", lambda: _choose(page, "hispanic_ethnicity", "Yes" if p["eeo.hispanic_latino"] else "No")),
         ("candidate-location", lambda: _choose_first(page, "candidate-location", p["address.city"], prefer="Virginia")),
         ("school--0", lambda: _choose_first(page, "school--0", p["education.school"])),
         ("degree--0", lambda: _choose_first(page, "degree--0", "Bachelor")),
@@ -111,6 +113,10 @@ def _outcome(page: Page) -> str | None:
     if re.search(r"security code|verification code", body, re.I):
         return "needs_code"
     return None
+
+
+def confirmed(page: Page) -> bool:
+    return _outcome(page) == "submitted"
 
 
 def _code_from_file() -> str | None:

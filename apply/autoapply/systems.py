@@ -14,17 +14,18 @@ class System:
     fetch_job: Callable
     fill: Callable
     submit: Callable
+    confirmed: Callable  # page -> True once the company's "thanks for applying" page shows
 
 
 def _module_system(name: str, m: ModuleType) -> System:
-    return System(name, m.matches, m.fetch_job, m.fill, m.submit)
+    return System(name, m.matches, m.fetch_job, m.fill, m.submit, m.confirmed)
 
 
 SYSTEMS = [
     _module_system("Ashby", ashby),
     _module_system("Lever", lever),
     System("Greenhouse", lambda url: greenhouse_api.parse_url(url) is not None,
-           greenhouse_api.fetch_job, greenhouse_form.fill, greenhouse_form.submit),
+           greenhouse_api.fetch_job, greenhouse_form.fill, greenhouse_form.submit, greenhouse_form.confirmed),
 ]
 
 

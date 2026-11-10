@@ -155,6 +155,10 @@ def fill(page: Page, job: Job, answers: dict[str, Answer], p: Profile) -> list[s
 CONFIRM_RE = re.compile(r"thank you for applying|application (was )?(successfully )?submitted|we.ve received your application", re.I)
 
 
+def confirmed(page: Page) -> bool:
+    return bool(CONFIRM_RE.search(page.inner_text("body")))
+
+
 def submit(page: Page, screenshot, ask_code=None, get_code=None) -> str:
     """Ashby doesn't email codes; the code arguments match Greenhouse's submit."""
     page.get_by_role("button", name=re.compile(r"submit application", re.I)).first.click()
