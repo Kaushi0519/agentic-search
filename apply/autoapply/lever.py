@@ -99,8 +99,12 @@ def fill(page: Page, job: Job, answers: dict[str, Answer], p: Profile) -> list[s
         page.locator('input[type=file][name="resume"]').set_input_files(a.value)
         try:
             page.locator(".resume-upload-success, .filename").first.wait_for(timeout=20000)
+            # Lever then parses the resume and prefills fields; wait for that before filling.
+            page.wait_for_function("() => document.querySelector('input[name=org]')?.value"
+                                   " || document.querySelector('input[name=name]')?.value", timeout=15000)
         except Exception:  # noqa: BLE001
-            problems.append("Resume: upload not confirmed")
+            pass
+        page.wait_for_timeout(1000)
 
     for field, a in answers.items():
         q = by_field[field]
@@ -134,6 +138,16 @@ def fill(page: Page, job: Job, answers: dict[str, Answer], p: Profile) -> list[s
                     page.locator(f'input[type=checkbox][name="{field}"][value="{v}"]').check()
         except Exception as e:  # noqa: BLE001
             problems.append(f"{q.label[:60]}: {type(e).__name__}")
+
+    # Final pass: a late resume parse can overwrite text fields; put back the intended values.
+    page.wait_for_timeout(1500)
+    for field, a in answers.items():
+        q = by_field[field]
+        if q.kind in ("text", "textarea") and field != "resume":
+            box = page.locator(f'[name="{field}"]').first
+            want = "" if a.value in (None, "") else str(a.value)
+            if box.count() and box.input_value() != want:
+                box.fill(want)
     return problems
 
 

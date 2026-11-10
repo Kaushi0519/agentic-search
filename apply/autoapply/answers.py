@@ -126,8 +126,19 @@ Rules:
 - For "select" questions, put exactly one option label in `choices`, copied exactly. For \
 "multiselect", one or more labels. Leave `text` empty.
 - For text questions, put the answer in `text`. Keep short answers short (a name, a number, a \
-city). For essay questions ("why this company", "tell us about a project") write 3-5 plain, \
-specific sentences connecting the candidate's real experience to this job. No clichés.
+city).
+- Written answers ("why this company", "a hard technical problem", "something you're proud of"):
+  - If <answer_bank> has an answer to the same question, use it, adapted only as needed.
+  - Otherwise pick the ONE experience or project from the resumes that best fits the question \
+and this job, and go deep on it rather than listing several.
+  - Say what the candidate built, the specific technologies, the hard part, how they solved it, \
+and the measured result, using the exact numbers and names from the resume. Never invent or \
+round numbers, tools, team sizes or outcomes the resume doesn't state.
+  - Connect it to what this team does, using specifics from the job description.
+  - 5-8 sentences unless the question gives a limit. First person, plain and direct; no filler \
+("I am passionate about…", "I believe…", "In today's world…").
+  - "Something not on your resume": use a project from <other_resume> that isn't in \
+<resume_sent>, if there is one.
 - Salary or pay expectations: use the pay range in the job description if there is one; \
 otherwise give the typical hourly rate for this kind of internship at this company in the US.
 - Yes/no questions about the candidate's history (worked here before, relatives here, \
@@ -151,12 +162,16 @@ site like Indeed or LinkedIn.
 - Answer every question in the list, using its exact `field`."""
 
 
-def _ai(questions: list[Question], job: Job, p: Profile) -> dict[str, Answer]:
+def _ai(questions: list[Question], job: Job, p: Profile, resume: str) -> dict[str, Answer]:
     if not questions:
         return {}
     profile = {k: v for k, v in p.data.items() if k != "eeo"}
+    other = next(v for v in p.resumes if v != resume)
     prompt = (
         f"<profile>\n{yaml.safe_dump(profile, sort_keys=False, allow_unicode=True)}</profile>\n\n"
+        f"<resume_sent version={json.dumps(resume)}>\n{p.resume_text(resume)}\n</resume_sent>\n\n"
+        f"<other_resume version={json.dumps(other)}>\n{p.resume_text(other)}\n</other_resume>\n\n"
+        f"<answer_bank>\n{p.answer_bank()}\n</answer_bank>\n\n"
         f"<job company={json.dumps(job.company)} title={json.dumps(job.title)} location={json.dumps(job.location)}>\n"
         f"{job.description[:8000]}\n</job>\n\n"
         "<questions>\n"
@@ -184,7 +199,10 @@ def _ai(questions: list[Question], job: Job, p: Profile) -> dict[str, Answer]:
             value = (valid[:1] if q.kind == "select" else valid) or None
             out[q.field] = Answer(value[0] if value and q.kind == "select" else value, "ai", ok)
         else:
-            out[q.field] = Answer(a.text.strip() or None, "ai", a.confident)
+            text = a.text.strip() or None
+            # Written answers always go to you for a read before submitting.
+            essay = q.kind == "textarea" and text and len(text) > 200
+            out[q.field] = Answer(text, "ai", a.confident and not essay)
     return out
 
 
@@ -204,7 +222,7 @@ def answer_all(job: Job, p: Profile, resume: str) -> dict[str, Answer]:
             answers[q.field] = a
         else:
             pending.append(q)
-    answers.update(_ai(pending, job, p))
+    answers.update(_ai(pending, job, p, resume))
     for q in pending:
         answers.setdefault(q.field, Answer(None, "ai", confident=not q.required))
     return answers

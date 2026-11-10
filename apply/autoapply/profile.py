@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
+from pypdf import PdfReader
 
 PRIVATE = Path(__file__).resolve().parents[2] / "private"
 
@@ -22,6 +23,14 @@ class Profile:
         for part in path.split("."):
             value = value[part]
         return value
+
+    def resume_text(self, version: str) -> str:
+        return "\n".join(page.extract_text() or "" for page in PdfReader(self.resumes[version]).pages)
+
+    def answer_bank(self) -> str:
+        """Answers you've written or approved, reused for matching questions."""
+        path = PRIVATE / "answer_bank.md"
+        return path.read_text() if path.exists() else ""
 
     def resume_for(self, title: str, category: str | None) -> str:
         """AI/ML resume for AI, ML and data roles; SWE resume for everything else."""

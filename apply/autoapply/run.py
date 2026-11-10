@@ -58,7 +58,7 @@ def _summary(job: Job, answers: dict[str, Answer], problems: list[str], resume: 
         if a.confident:
             continue
         value = ", ".join(a.value) if isinstance(a.value, list) else (a.value or "(left blank)")
-        unsure.append(f"• {e(labels[field][:80])}\n   → <i>{e(str(value)[:300])}</i>")
+        unsure.append(f"• {e(labels[field][:120])}\n   → <i>{e(str(value)[:1500])}</i>")
     filled = sum(1 for a in answers.values() if a.value not in (None, "", []))
     text = (f"<b>{e(job.company)}</b> — {e(job.title)}\n"
             f"{e(job.location)} · {job.system} · {resume} resume · {filled} answers filled\n")
