@@ -15,3 +15,6 @@
 .venv/
 __pycache__/
 .pytest_cache/
+
+# Personal info for auto-apply (resumes, profile): never committed
+private/
