@@ -1,8 +1,8 @@
-"""Fill (and optionally submit) one Greenhouse application.
+"""Fill (and optionally submit) one application (Greenhouse or Ashby).
 
-    python -m autoapply <greenhouse url>            fill, screenshot, don't submit
-    python -m autoapply <greenhouse url> --headed   same, in a visible browser
-    python -m autoapply <greenhouse url> --submit   fill and submit
+    python -m autoapply <url>            fill, screenshot, don't submit
+    python -m autoapply <url> --headed   same, in a visible browser
+    python -m autoapply <url> --submit   fill and submit
 """
 
 import argparse
@@ -13,9 +13,9 @@ from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 
 from .answers import answer_all
-from .greenhouse_api import fetch_job
-from .greenhouse_form import fill, submit
 from .profile import PRIVATE, load_profile
+from .systems import system_for
+from .tracker import log_application
 
 
 def main() -> None:
@@ -28,9 +28,12 @@ def main() -> None:
 
     load_dotenv(PRIVATE / "tracker.env")
     profile = load_profile()
-    job = fetch_job(args.url)
+    system = system_for(args.url)
+    if not system:
+        raise SystemExit(f"Unsupported application system: {args.url}")
+    job = system.fetch_job(args.url)
     resume = profile.resume_for(job.title, args.category)
-    print(f"{job.company} — {job.title} ({job.location})\nResume: {resume}\n")
+    print(f"[{job.system}] {job.company} — {job.title} ({job.location})\nResume: {resume}\n")
 
     answers = answer_all(job, profile, resume)
     labels = {q.field: q for q in job.questions}
@@ -47,13 +50,16 @@ def main() -> None:
         ctx = pw.chromium.launch_persistent_context(
             PRIVATE / "browser-profile", headless=not args.headed, viewport={"width": 1280, "height": 1000})
         page = ctx.new_page()
-        problems = fill(page, job, answers, profile)
+        problems = system.fill(page, job, answers, profile)
         page.screenshot(path=str(shots / f"{stamp}-filled.png"), full_page=True)
         print("\nCouldn't fill:" if problems else "\nAll fields filled.", *problems, sep="\n  ")
         print(f"Screenshot: {shots / f'{stamp}-filled.png'}")
         if args.submit:
-            result = submit(page, shots / f"{stamp}-submitted.png")
+            result = system.submit(page, shots / f"{stamp}-submitted.png")
             print("Result:", result)
+            if result == "submitted":
+                row = log_application(job.company, job.title, job.location, resume, job.system, args.url)
+                print(f"Added to tracker (row {row})")
         ctx.close()
 
 

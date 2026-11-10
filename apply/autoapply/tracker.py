@@ -1,6 +1,7 @@
 """Adds a row to the application tracker sheet through its Apps Script web app (tracker.gs)."""
 
 import os
+from datetime import date
 
 import httpx
 
@@ -19,3 +20,16 @@ def add_row(row: dict[str, str]) -> int:
     if not body.get("ok"):
         raise RuntimeError(f"Tracker rejected the row: {body}")
     return body["row"]
+
+
+def log_application(company: str, title: str, location: str, resume: str, system: str, url: str) -> int:
+    return add_row({
+        "Company": company,
+        "Role": title,
+        "Location": location,
+        "Application Date": date.today().isoformat(),
+        "Status": "Applied",
+        "Resume Version": resume,
+        "Cover Letter": "No",
+        "Notes": f"Auto-applied ({system}) {url}",
+    })

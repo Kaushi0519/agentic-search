@@ -2,11 +2,12 @@
 
 import re
 from pathlib import Path
+from typing import Callable
 
 from playwright.sync_api import Page, TimeoutError as PlaywrightTimeout
 
 from .answers import Answer
-from .greenhouse_api import Job
+from .job import Job
 from .profile import PRIVATE, Profile
 
 
@@ -112,18 +113,30 @@ def _outcome(page: Page) -> str | None:
     return None
 
 
-def wait_for_code(page: Page, screenshot: Path, minutes: int = 15) -> str:
-    """Greenhouse emailed a security code. Wait for it to be typed into the open browser,
-    or written to private/code.txt, then submit."""
+def _code_from_file() -> str | None:
+    if not CODE_FILE.exists():
+        return None
+    code = CODE_FILE.read_text()
+    CODE_FILE.unlink()
+    return code
+
+
+def _ask_in_terminal() -> None:
     CODE_FILE.unlink(missing_ok=True)
-    print(f"Waiting up to {minutes} min for the emailed security code "
+    print("Waiting for the emailed security code "
           f"(type it in the browser and click Submit, or write it to {CODE_FILE})", flush=True)
+
+
+def wait_for_code(page: Page, screenshot: Path, ask: Callable[[], None], get: Callable[[], str | None],
+                  minutes: int = 15) -> str:
+    """Greenhouse emailed a security code. `ask` tells you; `get` is polled for the code (it can
+    also be typed straight into the open browser). Then submit."""
+    ask()
     for _ in range(minutes * 30):
         if _outcome(page) == "submitted":
             break
-        if CODE_FILE.exists():
-            code = re.sub(r"\s", "", CODE_FILE.read_text())
-            CODE_FILE.unlink()
+        if code := get():
+            code = re.sub(r"\s", "", code)
             boxes = page.locator('input[id^="security-input"], input[name*="security"], input[autocomplete="one-time-code"], input[maxlength="1"]')
             if boxes.count() > 1:
                 for box, ch in zip(boxes.all(), code):
@@ -137,7 +150,8 @@ def wait_for_code(page: Page, screenshot: Path, minutes: int = 15) -> str:
     return _outcome(page) or "error: no confirmation after code"
 
 
-def submit(page: Page, screenshot: Path) -> str:
+def submit(page: Page, screenshot: Path, ask_code: Callable[[], None] = _ask_in_terminal,
+           get_code: Callable[[], str | None] = _code_from_file) -> str:
     """Click Submit. Returns "submitted", "needs_code" (email security code) or "error: …"."""
     page.get_by_role("button", name=re.compile(r"submit", re.I)).first.click()
     try:
@@ -151,7 +165,7 @@ def submit(page: Page, screenshot: Path) -> str:
     page.screenshot(path=str(screenshot), full_page=True)
     outcome = _outcome(page)
     if outcome == "needs_code":
-        return wait_for_code(page, screenshot)
+        return wait_for_code(page, screenshot, ask_code, get_code)
     if outcome:
         return outcome
     errors = page.locator('[class*="error"], [role="alert"]').all_inner_texts()

@@ -1,37 +1,16 @@
 """A Greenhouse posting's questions, from the public job board API."""
 
-import html
 import re
-from dataclasses import dataclass, field
+from urllib.parse import urlsplit
 
 import httpx
-from urllib.parse import urlsplit
+
+from .job import Job, Question, strip_html
 
 # job-boards.greenhouse.io/<board>/jobs/<id>, boards.greenhouse.io/<board>/jobs/<id>,
 # or an embed link ...?for=<board>&token=<id>
 JOB_RE = re.compile(r"greenhouse\.io/(?:embed/job_app\?for=)?([\w-]+)/jobs/(\d+)")
 EMBED_RE = re.compile(r"[?&]for=([\w-]+).*?[?&]token=(\d+)")
-
-
-@dataclass
-class Question:
-    field: str           # form field name, e.g. "first_name", "question_123", "4005121007"
-    label: str
-    kind: str            # "text", "textarea", "file", "select", "multiselect"
-    required: bool
-    options: list[str] = field(default_factory=list)
-
-
-@dataclass
-class Job:
-    board: str
-    id: str
-    company: str
-    title: str
-    location: str
-    url: str
-    description: str
-    questions: list[Question]
 
 
 KINDS = {
@@ -76,11 +55,6 @@ def parse_url(url: str) -> tuple[str, str] | None:
     return None
 
 
-def strip_html(s: str) -> str:
-    text = re.sub(r"<[^>]+>", " ", html.unescape(html.unescape(s or "")))
-    return re.sub(r"\s+", " ", text).strip()
-
-
 def _questions(raw: list[dict]) -> list[Question]:
     out = []
     for q in raw:
@@ -89,6 +63,8 @@ def _questions(raw: list[dict]) -> list[Question]:
             # resume_text / cover_letter_text are the "enter manually" twins of the uploads.
             if kind is None or f["name"] in ("resume_text", "cover_letter_text"):
                 continue
+            if f["name"] == "location":
+                kind = "location"
             options = [v["label"] for v in f.get("values", [])]
             # Yes/no checkboxes come back as a select with values 0/1.
             out.append(Question(f["name"].removesuffix("[]"), strip_html(q["label"]), kind, q.get("required", False), options))
@@ -116,6 +92,7 @@ def fetch_job(url: str) -> Job:
                                       [o["label"] for o in q.get("answer_options", [])]))
 
     return Job(
+        system="Greenhouse",
         board=board,
         id=job_id,
         company=d.get("company_name") or board,

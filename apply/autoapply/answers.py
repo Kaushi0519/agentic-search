@@ -13,7 +13,7 @@ import anthropic
 import yaml
 from pydantic import BaseModel
 
-from .greenhouse_api import Job, Question
+from .job import Job, Question
 from .profile import Profile
 
 MODEL = "claude-haiku-5-5"
@@ -46,18 +46,31 @@ def _rule(q: Question, p: Profile) -> Answer | None:
         "preferred_name": p["name.preferred"],
         "email": p["email"],
         "phone": p["phone"],
+        "_systemfield_name": f'{p["name.first"]} {p["name.last"]}',
+        "_systemfield_email": p["email"],
     }
     if q.field in text:
         return Answer(text[q.field], "profile")
-    if q.field == "location":
-        return Answer(None, "profile")  # the location search box is filled with the form's extras
+    if q.kind == "location":
+        return Answer(None, "profile")  # each form's location search box is filled by its filler
+    if q.kind == "text":
+        if re.fullmatch(r"(full |legal )?name", label):
+            return Answer(f'{p["name.first"]} {p["name.last"]}', "profile")
+        if re.fullmatch(r"(e-?mail|email address)", label):
+            return Answer(p["email"], "profile")
+        if re.search(r"\bphone\b", label) and "?" not in label:
+            return Answer(p["phone"], "profile")
+        if re.search(r"\b(zip|postal)\b", label):
+            return Answer(str(p["address.zip"]), "profile")
     if q.kind in ("text", "textarea"):
         if "linkedin" in label:
             return Answer(p["links.linkedin"], "profile")
         if "github" in label:
             return Answer(p["links.github"], "profile")
-        if re.search(r"website|portfolio", label) and "password" not in label:
-            return Answer(p["links.portfolio"] or p["links.github"], "profile")
+        if re.search(r"website|portfolio|personal (site|page)", label):
+            # No portfolio: leave it blank (GitHub only goes where GitHub is asked for).
+            # A required one is left blank too and flagged for you to decide.
+            return Answer(p["links.portfolio"] or None, "profile", confident=bool(p["links.portfolio"]) or not q.required)
         if re.search(r"preferred (first )?name", label):
             return Answer(p["name.preferred"], "profile")
         # "If yes, please explain…" follow-ups: every gating answer below is "no".
@@ -115,6 +128,8 @@ otherwise give the typical hourly rate for this kind of internship at this compa
 non-competes, conflicts of interest, clearances) come from the profile's `facts`.
 - Class year / academic standing / "undergrad level": use `facts.class_standing`, not the \
 dates; it already accounts for the candidate graduating early.
+- Website / portfolio questions: the candidate has no portfolio site. Leave them empty; never \
+put the GitHub link there unless the question asks for GitHub specifically.
 - Acknowledgements and certifications that the application is accurate: agree.
 - How the candidate heard about the job: they found it on an online internship list. Pick a \
 generic option ("Job Board", "Online job posting", "Internet", "Other"); never name a specific \
@@ -166,7 +181,7 @@ def answer_all(job: Job, p: Profile, resume: str) -> dict[str, Answer]:
     pending = []
     for q in job.questions:
         if q.kind == "file":
-            if q.field == "resume":
+            if q.field in ("resume", "_systemfield_resume") or re.search(r"\b(resume|cv)\b", q.label, re.I):
                 answers[q.field] = Answer(str(p.resumes[resume]), "profile")
             else:
                 # Cover letters: skip unless required (flagged for review).
