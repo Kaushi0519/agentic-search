@@ -12,6 +12,7 @@ import html
 import logging
 import os
 import re
+import subprocess
 import time
 from datetime import datetime, timezone
 
@@ -69,19 +70,22 @@ def _summary(job: Job, answers: dict[str, Answer], problems: list[str], resume: 
         text += "\n❓ <b>Check these</b>\n" + "\n".join(unsure) + "\n"
     if not problems and not unsure:
         text += "\nEverything filled with confident answers.\n"
-    return text + "\nTap ✏️ to see or change the filled form on your Mac."
+    if job.system in CHROME_ONLY:
+        return text + (f"\n{job.system}'s captcha blocks the bot's browser. Tap 🌐 to open it in your Chrome; "
+                       "I'll send the answers to paste.")
+    return text + "\nTap ✏️ to see or change the filled form on your Mac, or 🌐 to apply in your own Chrome."
 
 
-BUTTONS = lambda app_id: [("✅ Submit", f"submit:{app_id}"), ("✏️ Open & edit", f"edit:{app_id}"),
-                          ("⏭ Skip", f"skip:{app_id}")]
+def BUTTONS(app_id: int, system: str | None = None) -> list[list[tuple[str, str]]]:
+    """Lever's hCaptcha rejects the bot's browser, so Lever only gets the your-own-Chrome route."""
+    chrome = ("🌐 Open in my Chrome", f"chrome:{app_id}")
+    skip = ("⏭ Skip", f"skip:{app_id}")
+    if system in CHROME_ONLY:
+        return [[chrome], [skip]]
+    return [[("✅ Submit", f"submit:{app_id}"), ("✏️ Open & edit", f"edit:{app_id}")], [chrome, skip]]
 
 
-BUTTONS = lambda app_id: [("✅ Submit", f"submit:{app_id}"), ("✏️ Open & edit", f"edit:{app_id}"),
-                          ("⏭ Skip", f"skip:{app_id}")]
-
-
-def _stamp(job: Job) -> str:
-    return f"{job.board}-{job.id}-{datetime.now():%Y%m%d-%H%M%S}"
+CHROME_ONLY = {"Lever"}
 
 
 class Runner:
@@ -125,7 +129,7 @@ class Runner:
                          f"{html.escape(role['title'])}: {html.escape(str(e)[:200])}")
             return
         self.pages[app_id] = page
-        message_id = self.tg.send(_summary(job, answers, problems, resume), BUTTONS(app_id))
+        message_id = self.tg.send(_summary(job, answers, problems, resume), BUTTONS(app_id, job.system))
         self.store.update(app_id, status="awaiting", resume=resume, answers=answers, message_id=message_id)
         log.info("awaiting your OK: %s — %s", job.company, job.title)
 
@@ -151,6 +155,10 @@ class Runner:
             self.tg.edit_buttons(row["message_id"], "⏭ Skipped")
         elif action == "edit":
             self.open_for_editing(row)
+        elif action == "chrome":
+            self.open_in_chrome(row)
+        elif action == "applied":
+            self._finish(row, "submitted")
         elif action == "submit":
             self.tg.edit_buttons(row["message_id"], "⏳ Submitting…")
             self.submit(row)
@@ -174,6 +182,34 @@ class Runner:
         self.editing[app_id] = page
         self.tg.send(f"✏️ <b>{html.escape(row['company'])}</b> is open on your Mac. Change anything, then "
                      "click Submit on the page or tap ✅ Submit above.")
+
+    def open_in_chrome(self, row) -> None:
+        """Open the posting in your normal Chrome (Simplify fills the standard fields) and send the
+        bot's own answers to paste. The bot can't see that browser, so you tap ✅ I applied."""
+        subprocess.run(["open", "-a", "Google Chrome", row["url"]], check=False)
+        e = html.escape
+        system = system_for(row["url"])
+        labels = {q.field: q for q in system.fetch_job(row["url"]).questions}
+        picks, texts = [], []
+        for field, a in Store.answers_of(row).items():
+            q = labels.get(field)
+            # Simplify covers name, contact, links, EEO and the like; send the job's own questions.
+            if not q or a.source == "profile" or a.value in (None, "", []) or q.kind in ("file", "location"):
+                continue
+            if q.kind in ("text", "textarea"):
+                texts.append(f"<b>{e(q.label[:200])}</b>\n<code>{e(' '.join(str(a.value).split()))}</code>")
+            else:
+                value = ", ".join(a.value) if isinstance(a.value, list) else a.value
+                picks.append(f"• {e(q.label[:120])}\n   → <b>{e(value)}</b>")
+        self.tg.send(f"🌐 Opened <b>{e(row['company'])}</b> in your Chrome. "
+                     f"Resume to attach: <b>{e(row['resume'])}</b>. Tap a gray answer to copy it.")
+        if picks:
+            self.tg.send("<b>Choices</b>\n" + "\n".join(picks))
+        for text in texts:
+            self.tg.send(text)
+        message_id = self.tg.send("When you've submitted it, tap ✅ I applied and I'll add it to the tracker.",
+                                  [[("✅ I applied", f"applied:{row['id']}"), ("⏭ Skip", f"skip:{row['id']}")]])
+        self.store.update(row["id"], message_id=message_id)
 
     def submit(self, row) -> None:
         app_id = row["id"]
@@ -199,6 +235,9 @@ class Runner:
 
     def _finish(self, row, result: str, shot=None) -> None:
         if result == "submitted":
+            for pages in (self.pages, self.editing):
+                if (page := pages.pop(row["id"], None)) and not page.is_closed():
+                    page.close()
             sheet_row = log_application(row["company"], row["title"], row["location"], row["resume"],
                                         row["system"], row["url"])
             self.store.update(row["id"], status="submitted")
@@ -208,7 +247,7 @@ class Runner:
             message_id = self.tg.send(f"❌ <b>{html.escape(row['company'])}</b> — {html.escape(row['title'])} "
                          f"wasn't submitted: {html.escape(result[:300])}\n"
                          "Tap ✏️ Open & edit to finish it yourself, or ⏭ Skip.",
-                         BUTTONS(row["id"]))
+                         BUTTONS(row["id"], row["system"]))
             self.store.update(row["id"], detail=result[:500], message_id=message_id)
             if shot and shot.exists():
                 self.tg.send_file(shot, "What the form showed")
@@ -221,7 +260,7 @@ class Runner:
             if page.is_closed():
                 self.editing.pop(app_id)
                 message_id = self.tg.send(f"✏️ You closed <b>{html.escape(row['company'])}</b> without submitting. "
-                             "It's still waiting: ✅ Submit, ✏️ Open & edit or ⏭ Skip.", BUTTONS(app_id))
+                             "It's still waiting.", BUTTONS(app_id, row["system"]))
                 self.store.update(app_id, message_id=message_id)
             elif system_for(row["url"]).confirmed(page):
                 self.editing.pop(app_id)
@@ -264,15 +303,9 @@ class Runner:
 
 
 def _background_browser(pw) -> BrowserContext:
-    """Full Chrome in headless mode, so filling never takes over the screen. Headless Chrome
-    announces itself in its user agent; use the normal one so sites see a regular browser."""
-    path = PRIVATE / "browser-profile"
-    ctx = pw.chromium.launch_persistent_context(path, channel="chromium", headless=True)
-    agent = ctx.pages[0].evaluate("navigator.userAgent") if ctx.pages else ctx.new_page().evaluate("navigator.userAgent")
-    ctx.close()
+    """Chrome in headless mode, so filling never takes over the screen."""
     ctx = pw.chromium.launch_persistent_context(
-        path, channel="chromium", headless=True, viewport={"width": 1280, "height": 1000},
-        user_agent=agent.replace("HeadlessChrome", "Chrome"))
+        PRIVATE / "browser-profile", channel="chromium", headless=True, viewport={"width": 1280, "height": 1000})
     for blank in ctx.pages:
         blank.close()
     return ctx

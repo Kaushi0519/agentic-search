@@ -3,6 +3,7 @@
 import html
 import json
 import re
+from datetime import date
 
 import httpx
 from playwright.sync_api import Page
@@ -138,6 +139,13 @@ def fill(page: Page, job: Job, answers: dict[str, Answer], p: Profile) -> list[s
                     page.locator(f'input[type=checkbox][name="{field}"][value="{v}"]').check()
         except Exception as e:  # noqa: BLE001
             problems.append(f"{q.label[:60]}: {type(e).__name__}")
+
+    # The disability question comes with a signature (name and date) on the same form.
+    if answers.get("eeo[disability]") and answers["eeo[disability]"].value:
+        for name, value in (("eeo[disabilitySignature]", f'{p["name.first"]} {p["name.last"]}'),
+                            ("eeo[disabilitySignatureDate]", date.today().strftime("%m/%d/%Y"))):
+            if (box := page.locator(f'input[name="{name}"]')).count():
+                box.fill(value)
 
     # Final pass: a late resume parse can overwrite text fields; put back the intended values.
     page.wait_for_timeout(1500)
