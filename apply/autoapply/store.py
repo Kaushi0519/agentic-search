@@ -45,6 +45,13 @@ class Store:
     def known(self, role_id: int) -> bool:
         return self.db.execute("select 1 from applications where role_id = ?", (role_id,)).fetchone() is not None
 
+    def by_role(self, role_id: int) -> sqlite3.Row | None:
+        return self.db.execute("select * from applications where role_id = ?", (role_id,)).fetchone()
+
+    def delete(self, app_id: int) -> None:
+        self.db.execute("delete from applications where id = ?", (app_id,))
+        self.db.commit()
+
     def add(self, role: dict, status: str, **fields) -> int:
         cur = self.db.execute(
             "insert into applications (role_id, url, company, title, location, status) values (?, ?, ?, ?, ?, ?)",

@@ -24,12 +24,23 @@ class Telegram:
         return body["result"]
 
     def send(self, text: str, buttons: list[tuple[str, str]] | None = None) -> int:
-        data = {"chat_id": self.chat_id, "text": text[:4096], "parse_mode": "HTML",
-                "disable_web_page_preview": True}
-        if buttons:
-            data["reply_markup"] = json.dumps(
-                {"inline_keyboard": [[{"text": t, "callback_data": d} for t, d in buttons]]})
-        return self._call("sendMessage", data=data)["message_id"]
+        """Send text, split into several messages if it's over Telegram's 4,096-character limit.
+        Splits fall between lines, so keep each line's HTML tags closed. The buttons go on the
+        last part; its message id is returned."""
+        parts, current = [], ""
+        for line in text.split("\n"):
+            if current and len(current) + len(line) + 1 > 4000:
+                parts.append(current)
+                current = ""
+            current += ("\n" if current else "") + line[:4000]
+        parts.append(current)
+        for i, part in enumerate(parts):
+            data = {"chat_id": self.chat_id, "text": part, "parse_mode": "HTML", "disable_web_page_preview": True}
+            if buttons and i == len(parts) - 1:
+                data["reply_markup"] = json.dumps(
+                    {"inline_keyboard": [[{"text": t, "callback_data": d} for t, d in buttons]]})
+            message_id = self._call("sendMessage", data=data)["message_id"]
+        return message_id
 
     def send_file(self, path: Path, caption: str = "") -> None:
         with path.open("rb") as f:

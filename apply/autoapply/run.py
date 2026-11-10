@@ -58,7 +58,8 @@ def _summary(job: Job, answers: dict[str, Answer], problems: list[str], resume: 
         if a.confident:
             continue
         value = ", ".join(a.value) if isinstance(a.value, list) else (a.value or "(left blank)")
-        unsure.append(f"• {e(labels[field][:120])}\n   → <i>{e(str(value)[:1500])}</i>")
+        flat = " ".join(str(value).split())  # one line each, so long messages can split between them
+        unsure.append(f"• {e(labels[field][:120])}\n   → <i>{e(flat[:1500])}</i>")
     filled = sum(1 for a in answers.values() if a.value not in (None, "", []))
     text = (f"<b>{e(job.company)}</b> — {e(job.title)}\n"
             f"{e(job.location)} · {job.system} · {resume} resume · {filled} answers filled\n")
@@ -237,9 +238,15 @@ class Runner:
         """A job link you sent the bot: prepare it even if the scout never listed it."""
         role = role_for_url(url) or {"id": -abs(hash(url)) % 10**12, "company": "?", "title": "?",
                                      "url": url, "locations": [], "category": None}
-        if self.store.known(role["id"]):
+        earlier = self.store.by_role(role["id"])
+        if earlier and earlier["status"] in ("preparing", "failed"):
+            self.store.delete(earlier["id"])  # a draft that broke last time: try again
+            if page := self.pages.pop(earlier["id"], None):
+                page.close()
+        elif earlier:
             self.tg.send("You've already sent that one; it's in the list above.")
-        elif not system_for(url):
+            return
+        if not system_for(url):
             self.tg.send("I can't apply on that site yet (Greenhouse, Ashby and Lever only).")
         else:
             self.tg.send("⏳ Preparing it…")
@@ -249,10 +256,10 @@ class Runner:
         self.tg.poll(wait)
         while self.tg.taps:
             self.handle(*self.tg.taps.pop(0))
-        for text in self.tg.texts:
+        texts, self.tg.texts = self.tg.texts, []  # taken first, so an error can't replay them
+        for text in texts:
             if m := re.search(r"https?://\S+", text):
                 self.prepare_link(m[0])
-        self.tg.texts.clear()  # other stray messages (codes are read while submitting)
         self.check_editing()
 
 
