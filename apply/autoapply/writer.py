@@ -52,9 +52,11 @@ evidence, plus "open to your standard intern rate", and list the sources in the 
 - If the question needs a fact the candidate's materials don't have, write the best answer you can \
 and say exactly what to check in the notes.
 
-Reply in exactly this format:
+Reply in exactly this format. If the message has several questions, write a separate \
+<question>/<answer> pair for EACH one, in the order asked; never merge them into one answer:
 <question>the question, restated in a few words</question>
 <answer>the answer to paste</answer>
+(…one more pair per additional question…)
 <notes>one or two short lines: which story or project you used, anything to check, and sources \
 for salary answers. Empty if nothing to add.</notes>"""
 
@@ -108,16 +110,19 @@ class Writer:
             log.exception("write failed")
             self.tg.send(f"⚠️ Couldn't write that one: {html.escape(str(e)[:300])}")
             return
-        question, answer, notes = _tag(reply, "question"), _tag(reply, "answer"), _tag(reply, "notes")
-        if not answer:
-            answer = reply.strip()
-        if notes:
+        pairs = re.findall(r"<question>(.*?)</question>\s*<answer>(.*?)</answer>", reply, re.S)
+        if not pairs:
+            pairs = [("Saved answer", _tag(reply, "answer") or reply.strip())]
+        if notes := _tag(reply, "notes"):
             self.tg.send(f"<i>{html.escape(notes)}</i>")
-        self.count += 1
-        message_id = self.tg.send(f"<pre>{html.escape(answer)}</pre>",
-                                  [("💾 Save to answer bank", f"save:{self.count}")])
-        self.threads[message_id] = [*history, {"role": "assistant", "content": reply}]
-        self.saved[self.count] = (question or "Saved answer", answer, message_id)
+        for question, answer in pairs:
+            question, answer = question.strip(), answer.strip()
+            self.count += 1
+            message_id = self.tg.send(f"<b>{html.escape(question)}</b>\n<pre>{html.escape(answer)}</pre>",
+                                      [("💾 Save to answer bank", f"save:{self.count}")])
+            # Replying to any of the answers continues the same conversation.
+            self.threads[message_id] = [*history, {"role": "assistant", "content": reply}]
+            self.saved[self.count] = (question or "Saved answer", answer, message_id)
 
     def save(self, number: int) -> None:
         if number not in self.saved:
