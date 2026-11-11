@@ -22,6 +22,11 @@ GRAD_TITLE_RE = re.compile(
 CLASS_OF_RE = re.compile(r"\b(?:class of )?20\d\d graduates?\b", re.IGNORECASE)
 
 
+# Research Scientist interns are PhD roles (Meta posts ~100 a year). Kept only when the
+# source says a bachelor's student can apply.
+RESEARCH_SCIENTIST_RE = re.compile(r"\bresearch scientists?\b", re.IGNORECASE)
+
+
 def url_title(url: str) -> str:
     """The posting's own title from the URL's last segment, e.g.
     ".../job/McLean-VA/Risk-Management-Graduate-Intern_JR17553" → "Risk Management Graduate Intern JR17553".
@@ -34,6 +39,8 @@ def is_undergrad(listing: Listing, url: str | None = None) -> bool:
     if GRAD_TITLE_RE.search(listing.title):
         return False
     if GRAD_TITLE_RE.search(url_title(url or listing.url)):
+        return False
+    if RESEARCH_SCIENTIST_RE.search(listing.title) and not UNDERGRAD_DEGREES.intersection(listing.degrees or []):
         return False
     # An empty or missing degree list means the source doesn't know; keep it.
     if listing.degrees and not UNDERGRAD_DEGREES.intersection(listing.degrees):

@@ -59,6 +59,10 @@ def test_mixed_locations_keep_only_us():
     ("Masters Intern", None, False),
     ("Software Engineer Intern - Graduates", None, False),
     ("Quantitative Master’s Intern", None, False),
+    ("Research Scientist Intern - LLM Memory and Skills", [], False),
+    ("Intern, AI System Architecture Research Scientist", None, False),
+    ("Research Scientist Intern", ["Bachelor's"], True),
+    ("Data Scientist Intern", None, True),
 ])
 def test_undergrad(title, degrees, expected):
     assert is_undergrad(listing(title=title, degrees=degrees)) is expected
@@ -78,7 +82,9 @@ def test_canonical_url_strips_tracking():
     ("https://intel.wd1.myworkdayjobs.com/external/job/US-Oregon-Hillsboro/AI-Intern_JR0286629",
      "workday:intel:JR0286629"),
     ("https://psu.wd1.myworkdayjobs.com/PSU_Staff/job/Park/Research-Assistant--SRI-_REQ_0000083297-1",
-     "workday:psu:REQ_0000083297-1"),
+     "workday:psu:REQ_0000083297"),
+    ("https://rockwellautomation.wd1.myworkdayjobs.com/External-Rockwell-Automation-Early-Careers/job/Mequon-Wisconsin-United-States/Intern--Software-Developer-Engineering_R26-8666-1",
+     "workday:rockwellautomation:R26-8666"),
     ("https://wd5.myworkdaysite.com/recruiting/microchiphr/External/job/CA---San-Jose/Intern_R3851-26",
      "workday:microchiphr:R3851-26"),
     ("https://jobs.lever.co/palantir/e0010393-c300-446f-bf67-fa2ef067f16f/apply",

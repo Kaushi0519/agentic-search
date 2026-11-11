@@ -12,6 +12,9 @@ SHORTENER_HOSTS = {"go.vansh.nyc"}
 UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.IGNORECASE)
 # Workday puts the requisition ID at the end of the slug: ..._JR0286629, ..._REQ_0000083297-1
 WORKDAY_REQ_RE = re.compile(r"_([A-Za-z]{0,6}[-_]?\d[\w-]*)$")
+# One requisition posted on several career sites gets -1, -2… on the end (R26-8666-1 and
+# R26-8666-2), so those are dropped. Longer endings are part of the ID (R3851-26, REQ-2026-18043).
+WORKDAY_POSTING_SUFFIX_RE = re.compile(r"(?<=\d)-\d$")
 # A bare number is an ID; a number leading a slug only if it is long, so the
 # year in "2027-data-science-intern" never counts.
 NUMERIC_SEGMENT_RE = re.compile(r"^(\d{4,})$|^(\d{6,})-")
@@ -57,7 +60,8 @@ def job_id(url: str) -> str | None:
         else:
             tenant = segments[segments.index("recruiting") + 1] if "recruiting" in segments[:-1] else host
         if segments and (m := WORKDAY_REQ_RE.search(segments[-1])):
-            return f"workday:{tenant}:{m.group(1).upper()}"
+            req = WORKDAY_POSTING_SUFFIX_RE.sub("", m.group(1).upper())
+            return f"workday:{tenant}:{req}"
 
     # Lever, Ashby, Rippling and others: UUIDs are unique on their own.
     if m := UUID_RE.search(path):
