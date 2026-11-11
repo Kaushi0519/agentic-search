@@ -15,6 +15,7 @@ class Telegram:
     offset: int = 0
     taps: list[tuple[str, str]] = field(default_factory=list)  # (action, application id) from buttons
     texts: list[str] = field(default_factory=list)              # plain messages, e.g. a code
+    messages: list[dict] = field(default_factory=list)          # same, with ids, for reply threads
 
     def _call(self, method: str, timeout: float = 30, **kwargs) -> dict:
         r = httpx.post(f"https://api.telegram.org/bot{self.token}/{method}", timeout=timeout, **kwargs)
@@ -70,6 +71,8 @@ class Telegram:
                     self.taps.append((action, app_id))
             elif (msg := u.get("message")) and str(msg["chat"]["id"]) == self.chat_id and msg.get("text"):
                 self.texts.append(msg["text"])
+                self.messages.append({"id": msg["message_id"], "text": msg["text"],
+                                      "reply_to": (msg.get("reply_to_message") or {}).get("message_id")})
 
     def next_text(self) -> str | None:
         self.poll()

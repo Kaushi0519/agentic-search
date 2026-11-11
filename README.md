@@ -1,6 +1,6 @@
 # Agentic Search
 
-Automates the internship search. A worker watches the big Summer 2027 internship lists on GitHub, keeps only **US, undergrad** roles, removes duplicates across lists, and sends each new role **once** to Telegram (iPhone + Mac) and a live dashboard. An auto-apply bot on your Mac then fills the application for each new Greenhouse, Ashby or Lever role and asks for your OK in a separate Telegram chat before submitting, logging every application to a Google Sheet.
+Automates the internship search. A worker watches the big Summer 2027 internship lists on GitHub, keeps only **US, undergrad** roles, removes duplicates across lists, and sends each new role **once** to Telegram (iPhone + Mac) and a live dashboard. An auto-apply bot on your Mac then fills the application for each new Greenhouse, Ashby or Lever role and asks for your OK in a separate Telegram chat before submitting, logging every application to a Google Sheet. A third bot writes answers to the application questions you send it.
 
 **Dashboard:** https://agentic-search-gamma.vercel.app
 
@@ -64,13 +64,23 @@ You can also send the apply bot any job link to prepare that application, e.g. a
 
 Your personal data (profile, resumes, answer bank, keys, browser profiles, application history) lives in `private/`, which is git-ignored.
 
+## Answer writer
+
+A separate Telegram bot (`apply/autoapply/writer.py`) for the written questions you answer yourself. Send it the company, role, job description and question in one message, in any format, and it replies with an answer in a copy box plus a short note on which story or project it used and what to double-check.
+
+- **Revise** by replying to an answer ("shorter", "use a different project").
+- **💾 Save** adds an answer to the answer bank, which the auto-applier reuses too.
+- **Salary questions** trigger a web search for what that company pays interns, with sources.
+
+It writes with Claude Haiku from your profile, both resumes, the answer bank and the files in `private/knowledge/`: a STAR story bank, prepared interview answers and project notes. These are re-read for every question, so edits apply right away. It runs on your Mac on its own, independent of the auto-apply bot.
+
 ## Repo layout
 
 ```
 worker/       Python worker (scout package), schema.sql, tests
 dashboard/    Next.js dashboard
-apply/        Auto-apply bot (autoapply package) and tracker.gs, the sheet's Apps Script
-private/      Your profile, resumes and keys (git-ignored, not in the repo)
+apply/        Auto-apply bot and answer writer (autoapply package), tracker.gs for the sheet
+private/      Your profile, resumes, knowledge files and keys (git-ignored, not in the repo)
 ```
 
 ## Setup
@@ -139,6 +149,8 @@ python -m playwright install chromium
 | `ANTHROPIC_API_KEY` | From console.anthropic.com |
 | `APPLY_BOT_TOKEN` | The apply bot's token |
 | `APPLY_CHAT_ID` | Your chat ID with the apply bot |
+| `ANSWER_BOT_TOKEN` | The answer writer bot's token (a third bot from @BotFather) |
+| `ANSWER_CHAT_ID` | Your chat ID with the answer writer bot |
 
 `DATABASE_URL` is read from `worker/.env`.
 
@@ -146,13 +158,16 @@ python -m playwright install chromium
 python -m autoapply <job url>            # fill one form and screenshot it, no submit
 python -m autoapply <job url> --submit   # fill, submit and log it
 python -m autoapply.run                  # the bot: watch for new roles, ask in Telegram
+python -m autoapply.writer               # the answer writer bot
 ```
 
-To keep the bot running, load it as a login agent (`launchctl bootstrap gui/$(id -u) <plist>`) with `caffeinate -i` so the Mac doesn't idle-sleep. It only applies while the Mac is awake and catches up on missed roles when it wakes.
+For the answer writer, add `private/knowledge/*.md` (stories, prepared answers, project notes); any Markdown file there becomes context.
+
+To keep the bots running, load each as a login agent (`launchctl bootstrap gui/$(id -u) <plist>`) with `caffeinate -i` so the Mac doesn't idle-sleep. It only applies while the Mac is awake and catches up on missed roles when it wakes.
 
 ## Cost
 
-About $6.50–7/month: Railway ($5) and Haiku for auto-apply (~$1.50–2); everything else is on free plans. See [COSTS.md](COSTS.md) for the breakdown and a log of changes.
+About $7–8/month: Railway ($5), Haiku for auto-apply (~$1.50–2) and the answer writer (under $1); everything else is on free plans. See [COSTS.md](COSTS.md) for the breakdown and a log of changes.
 
 ## Roadmap
 
@@ -161,6 +176,7 @@ About $6.50–7/month: Railway ($5) and Haiku for auto-apply (~$1.50–2); every
 - [x] Live dashboard
 - [x] Auto-apply with Telegram approval: Greenhouse, Ashby, Lever
 - [x] Tracker sheet logging
+- [x] Answer writer bot for written application questions
 - [ ] More application systems: SmartRecruiters, Workable, then Workday (needs an account per company)
 - [ ] A Chrome extension that fills the bot's answers into your own browser
 - [ ] Applying while the Mac is off (an always-on machine or a cloud browser)

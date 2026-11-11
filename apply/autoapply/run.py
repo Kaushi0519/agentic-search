@@ -296,6 +296,7 @@ class Runner:
         while self.tg.taps:
             self.handle(*self.tg.taps.pop(0))
         texts, self.tg.texts = self.tg.texts, []  # taken first, so an error can't replay them
+        self.tg.messages.clear()
         for text in texts:
             if m := re.search(r"https?://\S+", text):
                 self.prepare_link(m[0])
