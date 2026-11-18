@@ -10,9 +10,10 @@ export type Role = {
   terms: string[] | null;
   sources: string[];
   first_seen_at: string;
+  applied_at: string | null;
 };
 
-export const ROLE_COLUMNS = "id, company, title, url, locations, category, terms, sources, first_seen_at";
+export const ROLE_COLUMNS = "id, company, title, url, locations, category, terms, sources, first_seen_at, applied_at";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -88,6 +89,12 @@ export function systemOf(url: string): string {
   if (parsed.searchParams.has("gh_jid")) return "Greenhouse";
   if (parsed.searchParams.has("ashby_jid")) return "Ashby";
   return "Company site";
+}
+
+/** Which resume fits the role; same rule as the auto-apply bot (apply/autoapply/profile.py). */
+export function resumeFor(title: string, category: string | null): "AI/ML" | "SWE" {
+  const ai = /\b(ai|ml|machine learning|data|deep learning|llm|nlp|computer vision)\b/i;
+  return ai.test(title) || ai.test(category ?? "") ? "AI/ML" : "SWE";
 }
 
 /** Same style as the GitHub lists: now, 12m, 5h, 2d. */

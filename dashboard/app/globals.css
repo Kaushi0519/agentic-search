@@ -15,6 +15,8 @@
   --tag-text: #59636e;
   --tag-summer: #dafbe1;
   --tag-summer-text: #1a7f37;
+  --done: #1a7f37;
+  --done-bg: #dafbe1;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -35,6 +37,8 @@
     --tag-text: #9198a1;
     --tag-summer: rgba(46, 160, 67, 0.15);
     --tag-summer-text: #3fb950;
+    --done: #3fb950;
+    --done-bg: rgba(46, 160, 67, 0.15);
   }
 }
 
@@ -274,6 +278,78 @@ h1 {
   cursor: pointer;
 }
 
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mark {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.mark.confirm {
+  border-color: var(--chip-active);
+  background: var(--chip-active);
+  color: #fff;
+}
+
+.mark.done {
+  border-color: transparent;
+  background: var(--done-bg);
+  color: var(--done);
+  font-weight: 600;
+}
+
+.mark:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.roles tr.applied td:not(:has(.actions)) {
+  opacity: 0.6;
+}
+
+.passcode {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--row-alt);
+}
+
+.passcode label {
+  font-size: 14px;
+}
+
+.passcode input {
+  flex: 1 1 160px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+
+.toast {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
 /* Phones: each row becomes a card. */
 @media (max-width: 700px) {
   .roles,
@@ -317,7 +393,7 @@ h1 {
     grid-column: 1 / -1;
   }
 
-  .roles td:has(.apply) {
+  .roles td:has(.actions) {
     grid-column: 1 / -1;
     margin-top: 6px;
   }

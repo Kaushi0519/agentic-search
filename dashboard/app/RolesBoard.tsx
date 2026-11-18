@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CATEGORIES,
   TERM_GROUPS,
@@ -17,6 +17,24 @@ import {
 } from "@/lib/roles";
 
 const PAGE = 100;
+const PASSCODE_KEY = "dashboard-passcode";
+
+function readPasscode(): string {
+  try {
+    return localStorage.getItem(PASSCODE_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function storePasscode(value: string) {
+  try {
+    if (value) localStorage.setItem(PASSCODE_KEY, value);
+    else localStorage.removeItem(PASSCODE_KEY);
+  } catch {
+    // Private browsing: it just won't be remembered.
+  }
+}
 const WINDOWS = { all: Infinity, "24h": 24 * 3600_000, "7d": 7 * 24 * 3600_000 } as const;
 type Window = keyof typeof WINDOWS;
 
@@ -36,6 +54,53 @@ export default function RolesBoard() {
   const [term, setTerm] = useState<TermGroup | "All">("All");
   const [added, setAdded] = useState<Window>("all");
   const [limit, setLimit] = useState(PAGE);
+  const [hideApplied, setHideApplied] = useState(false);
+
+  // "Applied" button: the passcode is asked once per browser, then remembered.
+  const [asking, setAsking] = useState<{ id: number; applied: boolean } | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [saving, setSaving] = useState<Set<number>>(new Set());
+
+  async function markApplied(id: number, applied: boolean, code = readPasscode()) {
+    if (!code) {
+      setAsking({ id, applied });
+      return;
+    }
+    setSaving((prev) => new Set(prev).add(id));
+    setMessage(null);
+    try {
+      const res = await fetch("/api/applied", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, passcode: code, applied }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (res.status === 401) {
+        storePasscode("");
+        setAsking({ id, applied });
+        setMessage("Wrong passcode. Try again.");
+        return;
+      }
+      if (!res.ok) {
+        setMessage(body.error ?? `Something went wrong (${res.status}).`);
+        return;
+      }
+      storePasscode(code);
+      setAsking(null);
+      const appliedAt = applied ? new Date().toISOString() : null;
+      setRoles((prev) => prev && prev.map((r) => (r.id === id ? { ...r, applied_at: appliedAt } : r)));
+      if (applied && body.sheet) setMessage(`Added to your tracker (row ${body.row}).`);
+      if (!applied) setMessage("Unmarked. The spreadsheet row stays; delete it there if you need to.");
+    } catch (e) {
+      setMessage(`Couldn't reach the dashboard server: ${e instanceof Error ? e.message : e}`);
+    } finally {
+      setSaving((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
+  }
 
   useEffect(() => {
     fetchAllRoles()
@@ -77,13 +142,14 @@ export default function RolesBoard() {
       (r) =>
         (category === "All" || categoryOf(r.category) === category) &&
         (term === "All" || termGroupOf(r.terms) === term) &&
+        (!hideApplied || !r.applied_at) &&
         new Date(r.first_seen_at).getTime() >= since &&
         (!q ||
           r.company.toLowerCase().includes(q) ||
           r.title.toLowerCase().includes(q) ||
           r.locations.some((l) => l.toLowerCase().includes(q))),
     );
-  }, [roles, query, category, term, added, now]);
+  }, [roles, query, category, term, added, hideApplied, now]);
 
   const counts = useMemo(() => {
     const c = new Map<Category, number>();
@@ -166,8 +232,33 @@ export default function RolesBoard() {
               {w === "all" ? "Any time" : `Last ${w}`}
             </button>
           ))}
+          <button
+            className={hideApplied ? "chip active" : "chip"}
+            aria-pressed={hideApplied}
+            onClick={() => {
+              setHideApplied((h) => !h);
+              setLimit(PAGE);
+            }}
+          >
+            Hide applied
+          </button>
         </div>
       </div>
+
+      {asking && (
+        <PasscodeForm
+          onSubmit={(code) => markApplied(asking.id, asking.applied, code)}
+          onCancel={() => {
+            setAsking(null);
+            setMessage(null);
+          }}
+        />
+      )}
+      {message && (
+        <p className="toast" role="status">
+          {message}
+        </p>
+      )}
 
       {error && <p className="notice">Couldn’t load roles: {error}</p>}
       {!roles && !error && <p className="notice">Loading roles…</p>}
@@ -188,7 +279,10 @@ export default function RolesBoard() {
             </thead>
             <tbody>
               {visible.map((r, i) => (
-                <tr key={r.id} className={fresh.has(r.id) ? "fresh" : undefined}>
+                <tr
+                  key={r.id}
+                  className={[fresh.has(r.id) && "fresh", r.applied_at && "applied"].filter(Boolean).join(" ") || undefined}
+                >
                   <td className="company">
                     {i > 0 && visible[i - 1].company === r.company ? (
                       <span className="same" title={r.company}>↳</span>
@@ -204,9 +298,16 @@ export default function RolesBoard() {
                     <Terms terms={termsOf(r.terms)} />
                   </td>
                   <td>
-                    <a className="apply" href={r.url} target="_blank" rel="noopener noreferrer">
-                      Apply
-                    </a>
+                    <div className="actions">
+                      <a className="apply" href={r.url} target="_blank" rel="noopener noreferrer">
+                        Apply
+                      </a>
+                      <AppliedButton
+                        applied={!!r.applied_at}
+                        saving={saving.has(r.id)}
+                        onConfirm={(applied) => markApplied(r.id, applied)}
+                      />
+                    </div>
                   </td>
                   <td className="age">{formatAge(r.first_seen_at, now)}</td>
                   <td className="system">{systemOf(r.url)}</td>
@@ -252,5 +353,85 @@ function Terms({ terms }: { terms: string[] }) {
         </span>
       ))}
     </>
+  );
+}
+
+/** Two taps so a stray click doesn't add a spreadsheet row: "Applied?" → "Confirm". */
+function AppliedButton({
+  applied,
+  saving,
+  onConfirm,
+}: {
+  applied: boolean;
+  saving: boolean;
+  onConfirm: (applied: boolean) => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current);
+  }, []);
+
+  if (saving) {
+    return (
+      <button className="mark" disabled>
+        Saving…
+      </button>
+    );
+  }
+  if (confirming) {
+    return (
+      <button
+        className="mark confirm"
+        onClick={() => {
+          setConfirming(false);
+          onConfirm(!applied);
+        }}
+      >
+        {applied ? "Undo?" : "Confirm"}
+      </button>
+    );
+  }
+  return (
+    <button
+      className={applied ? "mark done" : "mark"}
+      title={applied ? "Applied. Tap to unmark." : "Mark applied and add it to your tracker sheet"}
+      onClick={() => {
+        setConfirming(true);
+        if (timer.current) clearTimeout(timer.current);
+        timer.current = setTimeout(() => setConfirming(false), 4000);
+      }}
+    >
+      {applied ? "✓ Applied" : "Applied?"}
+    </button>
+  );
+}
+
+function PasscodeForm({ onSubmit, onCancel }: { onSubmit: (code: string) => void; onCancel: () => void }) {
+  const [code, setCode] = useState("");
+  return (
+    <form
+      className="passcode"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (code.trim()) onSubmit(code.trim());
+      }}
+    >
+      <label htmlFor="passcode">Dashboard passcode (asked once on this device)</label>
+      <input
+        id="passcode"
+        type="password"
+        autoComplete="current-password"
+        autoFocus
+        value={code}
+        onChange={(e) => setCode(e.target.value)}
+      />
+      <button type="submit" className="mark confirm">
+        Save
+      </button>
+      <button type="button" className="mark" onClick={onCancel}>
+        Cancel
+      </button>
+    </form>
   );
 }

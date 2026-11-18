@@ -37,7 +37,7 @@ The worker checks each file's latest commit with ETags (unchanged checks are fre
 
 **Notifications.** One Telegram message per new role: company, title, location(s), age and an Apply button. Only roles posted in the last 2 days alert; older ones (often reopened postings) go on the dashboard quietly. Unsent messages are retried after restarts. A source's first load is stored silently so you're not flooded with existing roles. If a source fails 10 polls in a row, the bot sends a warning (and a message when it recovers).
 
-**Dashboard.** A live table styled like the lists' READMEs: company, role, location, term (Summer / off-season, with a filter), the posting's application system (Workday, Greenhouse, …) and age. New roles appear without a refresh.
+**Dashboard.** A live table styled like the lists' READMEs: company, role, location, term (Summer / off-season, with a filter), the posting's application system (Workday, Greenhouse, …) and age. New roles appear without a refresh. After applying, tap **Applied? → Confirm** next to the role: it gets a ✓ on the dashboard (on every device) and a row in the tracker sheet. The first tap on a device asks for the dashboard passcode; only its hash is stored, in the database. **Hide applied** filters them out.
 
 ## Auto-apply
 
@@ -116,7 +116,7 @@ python -m pytest tests          # tests
 
 ### 4. Dashboard
 
-See [dashboard/README.md](dashboard/README.md). On Vercel, set the root directory to `dashboard` and add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
+See [dashboard/README.md](dashboard/README.md). On Vercel, set the root directory to `dashboard` and add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, plus `TRACKER_URL` and `TRACKER_SECRET` (the same values as the auto-apply bot) for the Applied button.
 
 ### 5. Auto-apply (on your Mac)
 

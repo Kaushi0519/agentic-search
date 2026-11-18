@@ -55,3 +55,34 @@ begin
         alter publication supabase_realtime add table roles;
     end if;
 end $$;
+
+-- "Applied" button on the dashboard. The dashboard's public key can't update
+-- roles, so it calls set_applied with your passcode; only a sha256 of the
+-- passcode is stored, in a table the public key can't read.
+alter table roles add column if not exists applied_at timestamptz;
+
+create table if not exists dashboard_passcode (
+    id   boolean primary key default true check (id),
+    hash text not null
+);
+alter table dashboard_passcode enable row level security;
+
+-- Returns true if the role's state changed (so the caller adds the sheet row
+-- once), false if it was already that way. Raises on a wrong passcode.
+create or replace function set_applied(p_role_id bigint, p_passcode text, p_applied boolean)
+returns boolean
+language plpgsql security definer set search_path = public, extensions
+as $$
+declare changed int;
+begin
+    if not exists (select 1 from dashboard_passcode
+                   where hash = encode(digest(p_passcode, 'sha256'), 'hex')) then
+        raise exception 'wrong passcode' using errcode = '28P01';
+    end if;
+    update roles set applied_at = case when p_applied then now() end
+     where id = p_role_id and (applied_at is null) = p_applied;
+    get diagnostics changed = row_count;
+    return changed > 0;
+end $$;
+revoke all on function set_applied(bigint, text, boolean) from public;
+grant execute on function set_applied(bigint, text, boolean) to anon, authenticated;
