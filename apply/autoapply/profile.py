@@ -9,7 +9,11 @@ from pypdf import PdfReader
 
 PRIVATE = Path(__file__).resolve().parents[2] / "private"
 
-AI_TITLE_RE = re.compile(r"\b(ai|ml|machine learning|data|deep learning|llm|nlp|computer vision)\b", re.IGNORECASE)
+# AI or ML in the title in some form. "Data" alone and the list's category don't count:
+# lists file plain "Software Engineer Intern" roles under AI/ML/Data.
+AI_TITLE_RE = re.compile(
+    r"\b(ai|ml|a\.i\.|artificial intelligence|machine learning|deep learning|llms?|genai|nlp|computer vision)\b",
+    re.IGNORECASE)
 
 
 @dataclass
@@ -32,11 +36,9 @@ class Profile:
         path = PRIVATE / "answer_bank.md"
         return path.read_text() if path.exists() else ""
 
-    def resume_for(self, title: str, category: str | None) -> str:
-        """AI/ML resume for AI, ML and data roles; SWE resume for everything else."""
-        if AI_TITLE_RE.search(title) or (category and AI_TITLE_RE.search(category)):
-            return "AI/ML"
-        return "SWE"
+    def resume_for(self, title: str) -> str:
+        """AI/ML resume when the title mentions AI or ML; SWE resume for everything else."""
+        return "AI/ML" if AI_TITLE_RE.search(title) else "SWE"
 
 
 def load_profile() -> Profile:

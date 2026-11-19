@@ -62,7 +62,7 @@ async function addTrackerRow(role: Pick<Role, "company" | "title" | "url" | "loc
         Location: role.locations.join("; "),
         "Application Date": today,
         Status: "Applied",
-        "Resume Version": resumeFor(role.title, role.category),
+        "Resume Version": resumeFor(role.title),
         "Cover Letter": "No",
         Notes: `Applied (${systemOf(role.url)}) ${role.url}`,
       },

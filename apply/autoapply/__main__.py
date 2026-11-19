@@ -23,7 +23,6 @@ def main() -> None:
     ap.add_argument("url")
     ap.add_argument("--headed", action="store_true")
     ap.add_argument("--submit", action="store_true")
-    ap.add_argument("--category", default=None)
     args = ap.parse_args()
 
     load_dotenv(PRIVATE / "tracker.env")
@@ -32,7 +31,7 @@ def main() -> None:
     if not system:
         raise SystemExit(f"Unsupported application system: {args.url}")
     job = system.fetch_job(args.url)
-    resume = profile.resume_for(job.title, args.category)
+    resume = profile.resume_for(job.title)
     print(f"[{job.system}] {job.company} — {job.title} ({job.location})\nResume: {resume}\n")
 
     answers = answer_all(job, profile, resume)

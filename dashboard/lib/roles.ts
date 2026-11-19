@@ -91,10 +91,12 @@ export function systemOf(url: string): string {
   return "Company site";
 }
 
-/** Which resume fits the role; same rule as the auto-apply bot (apply/autoapply/profile.py). */
-export function resumeFor(title: string, category: string | null): "AI/ML" | "SWE" {
-  const ai = /\b(ai|ml|machine learning|data|deep learning|llm|nlp|computer vision)\b/i;
-  return ai.test(title) || ai.test(category ?? "") ? "AI/ML" : "SWE";
+/** The AI/ML resume only when the title says AI or ML in some form; otherwise SWE.
+ * Same rule as the auto-apply bot (apply/autoapply/profile.py). */
+const AI_TITLE =
+  /\b(ai|ml|a\.i\.|artificial intelligence|machine learning|deep learning|llms?|genai|nlp|computer vision)\b/i;
+export function resumeFor(title: string): "AI/ML" | "SWE" {
+  return AI_TITLE.test(title) ? "AI/ML" : "SWE";
 }
 
 /** Same style as the GitHub lists: now, 12m, 5h, 2d. */

@@ -116,7 +116,7 @@ class Runner:
             job = system.fetch_job(role["url"])
             self.store.update(app_id, company=job.company, title=job.title,
                               location=role["location"] or job.location)
-            resume = self.profile.resume_for(job.title, role["category"])
+            resume = self.profile.resume_for(job.title)
             answers = answer_all(job, self.profile, resume)
             page = self.background.new_page()
             problems = system.fill(page, job, answers, self.profile)
