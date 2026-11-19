@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CATEGORIES,
   TERM_GROUPS,
@@ -102,9 +102,38 @@ export default function RolesBoard() {
     }
   }
 
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadedAt, setLoadedAt] = useState<number | null>(null);
+
+  // Reload the roles without reloading the page (filters, search and scroll stay put).
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      setRoles(await fetchAllRoles());
+      setLoadedAt(Date.now());
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    // A tab left in the background can miss live updates; catch up when you come back to it.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [refresh]);
+
   useEffect(() => {
     fetchAllRoles()
-      .then(setRoles)
+      .then((r) => {
+        setRoles(r);
+        setLoadedAt(Date.now());
+      })
       .catch((e) => setError(e.message ?? String(e)));
 
     if (!supabase) return;
@@ -175,6 +204,10 @@ export default function RolesBoard() {
           <p className="subtitle">
             US · undergrad · {roles ? roles.length.toLocaleString() : "…"} roles
             <span className={live ? "status live" : "status"}>{live ? "Live" : "Connecting…"}</span>
+            <button className="refresh" onClick={refresh} disabled={refreshing} title="Reload the roles">
+              {refreshing ? "Refreshing…" : "↻ Refresh"}
+            </button>
+            {loadedAt && !refreshing && <span className="loaded">updated {formatAge(new Date(loadedAt).toISOString(), now)}</span>}
           </p>
         </div>
         <input
