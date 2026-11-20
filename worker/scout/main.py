@@ -18,7 +18,7 @@ from .notify import ConsoleNotifier, TelegramNotifier
 from .pipeline import Pipeline
 from .sources import SOURCES, GitHubPoller
 from .store import MemoryStore, PostgresStore
-from .verify import LocationChecker
+from .verify import LocationChecker, PostedDateChecker
 
 log = logging.getLogger("scout")
 
@@ -45,7 +45,8 @@ def main() -> None:
 
     poller = GitHubPoller(http, os.environ["GITHUB_TOKEN"])
     resolver = UrlResolver(http)
-    pipeline = Pipeline(store, notifier, resolver.resolve, LocationChecker(http).locations)
+    pipeline = Pipeline(store, notifier, resolver.resolve, LocationChecker(http).locations,
+                        PostedDateChecker(http).posted_at)
     interval = int(os.environ.get("POLL_SECONDS", "60"))
 
     failures = {src.name: 0 for src in SOURCES}

@@ -23,11 +23,13 @@ def is_stale(listing: Listing) -> bool:
 
 class Pipeline:
     def __init__(self, store, notifier, resolve_url: Callable[[str], str],
-                 check_locations: Callable[[str], list[str] | None] = lambda url: None):
+                 check_locations: Callable[[str], list[str] | None] = lambda url: None,
+                 check_posted: Callable[[str], datetime | None] = lambda url: None):
         self.store = store
         self.notifier = notifier
         self.resolve_url = resolve_url
         self.check_locations = check_locations
+        self.check_posted = check_posted
         self.keys: dict[str, int] = dict(store.load_keys())
         # Job IDs some source marked grad-only. Sources without degree data
         # (vansh, zshah) can list the same job, so their copies are dropped too.
@@ -71,6 +73,11 @@ class Pipeline:
                 self.store.attach(role_id, keys, source, locations)
                 stats["duplicate"] += 1
             else:
+                if not silent and not is_stale(listing):
+                    # About to alert: make sure the job is really new, not just new to the list.
+                    real = self.check_posted(url)
+                    if real and (listing.posted_at is None or real < listing.posted_at):
+                        listing.posted_at = real
                 quiet = silent or is_stale(listing)
                 role_id = self.store.insert_role(listing, locations, url, keys, quiet)
                 stats["old" if quiet and not silent else "new"] += 1

@@ -279,3 +279,35 @@ def test_zshah_dates_are_timezone_aware():
                   "posted_at": "2026-10-28"}}
     (l,) = parse_zshah(jobs, "zshah")
     assert l.posted_at.tzinfo is not None
+
+
+def test_list_date_replaced_by_employers_older_date(monkeypatch):
+    """vansh added a month-old ITW job and dated it today; Workday says September."""
+    monkeypatch.setattr("scout.pipeline.time.sleep", lambda s: None)
+    now = datetime.now(timezone.utc)
+    real = {"https://example.com/job/old": now - timedelta(days=60),
+            "https://example.com/job/new": now - timedelta(hours=3)}
+    store, notifier = MemoryStore(), Recorder()
+    p = Pipeline(store, notifier, lambda u: u, check_posted=real.get)
+    p.process("vansh", [])
+    p.process("vansh", [
+        listing(source="vansh", source_id="1", url="https://example.com/job/old", posted_at=now),
+        listing(source="vansh", source_id="2", url="https://example.com/job/new", posted_at=now),
+        listing(source="vansh", source_id="3", url="https://example.com/job/unknown", posted_at=now),
+    ])
+    assert p.flush_notifications() == 2
+    assert store.roles[1]["first_seen_at"] == now - timedelta(days=60)
+
+
+@pytest.mark.parametrize("url,api", [
+    ("https://itw.wd5.myworkdayjobs.com/external/job/Rogers---55374/Software-Engineering-Intern_JR10129",
+     "https://itw.wd5.myworkdayjobs.com/wday/cxs/itw/external/job/Rogers---55374/Software-Engineering-Intern_JR10129"),
+    ("https://nvidia.wd5.myworkdayjobs.com/en-US/University/job/US-TX-Austin/Software-Intern_JR1999",
+     "https://nvidia.wd5.myworkdayjobs.com/wday/cxs/nvidia/University/job/US-TX-Austin/Software-Intern_JR1999"),
+    ("https://wd5.myworkdaysite.com/recruiting/microchiphr/External/job/CA---San-Jose/Intern_R3851-26",
+     "https://wd5.myworkdaysite.com/wday/cxs/microchiphr/External/job/CA---San-Jose/Intern_R3851-26"),
+    ("https://boards.greenhouse.io/x/jobs/1", None),
+])
+def test_workday_api_url(url, api):
+    from scout.verify import workday_api_url
+    assert workday_api_url(url) == api
